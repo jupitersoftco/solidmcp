@@ -2,9 +2,12 @@
 //!
 //! Tests for Model Context Protocol server functionality.
 
+pub mod error_handling_tests;
 pub mod http;
 pub mod notifications_tests;
+pub mod protocol_parsing_tests;
 pub mod protocol_tests;
+pub mod session_management_tests;
 pub mod tools_tests;
 
 #[cfg(test)]
