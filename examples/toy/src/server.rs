@@ -260,12 +260,12 @@ pub async fn create_toy_server(notes_dir: PathBuf) -> Result<HighLevelMcpServer>
     let add_notification_tool = AddNotificationTool {};
 
     // Build server with all tools
-    let server = McpServerBuilder::new()
-        .add_tool(add_note_tool)
-        .add_tool(list_notes_tool)
-        .add_tool(add_notification_tool)
-        .build()
-        .await?;
+    let mut builder = McpServerBuilder::new();
+    builder = builder.add_tool(add_note_tool);
+    builder = builder.add_tool(list_notes_tool);
+    builder = builder.add_tool(add_notification_tool);
+
+    let server = builder.build().await?;
 
     Ok(server)
 }

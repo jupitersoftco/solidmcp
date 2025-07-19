@@ -194,7 +194,10 @@ impl CustomMcpHandler {
         let mut capabilities = json!({});
 
         // Add tools capability if we have tools
-        if !self.tools.blocking_read().is_empty() {
+        // Note: We use blocking_read() here which is safe because this is called
+        // during initialization before any async operations begin
+        let tools_count = self.tools.blocking_read().len();
+        if tools_count > 0 {
             capabilities["tools"] = json!({
                 "listChanged": false
             });
