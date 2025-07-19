@@ -4,13 +4,14 @@
 
 #[cfg(test)]
 use {
-    crate::protocol_impl::McpProtocolHandler,
+    crate::protocol_testable::McpProtocolHandler,
+    crate::protocol_impl::McpProtocolHandlerImpl,
     serde_json::json,
 };
 
 #[tokio::test]
 async fn test_mcp_cancel_notification() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     let cancel_message = json!({
         "jsonrpc": "2.0",
@@ -27,7 +28,7 @@ async fn test_mcp_cancel_notification() {
 
 #[tokio::test]
 async fn test_mcp_cancel_notification_with_id() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     let cancel_message = json!({
         "jsonrpc": "2.0",

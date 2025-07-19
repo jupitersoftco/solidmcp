@@ -4,21 +4,21 @@
 
 #[cfg(test)]
 use {
-    crate::protocol_impl::McpProtocolHandler,
-    crate::handlers::{SolidMcpHandler, Handler},
+    crate::protocol_testable::McpProtocolHandler,
+    crate::protocol_impl::McpProtocolHandlerImpl,
     serde_json::json,
 };
 
 #[tokio::test]
 async fn test_mcp_protocol_handler_creation() {
-    let handler = McpProtocolHandler::new();
+    let handler = McpProtocolHandlerImpl::new();
     assert!(!handler.is_initialized());
     assert_eq!(handler.protocol_version(), "2024-11-05");
 }
 
 #[tokio::test]
 async fn test_mcp_initialize() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     let init_message = json!({
         "jsonrpc": "2.0",
@@ -47,7 +47,7 @@ async fn test_mcp_initialize() {
 
 #[tokio::test]
 async fn test_mcp_tools_list_without_initialization() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     let tools_message = json!({
         "jsonrpc": "2.0",
@@ -63,7 +63,7 @@ async fn test_mcp_tools_list_without_initialization() {
 
 #[tokio::test]
 async fn test_mcp_unknown_method() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     let unknown_message = json!({
         "jsonrpc": "2.0",
@@ -79,7 +79,7 @@ async fn test_mcp_unknown_method() {
 
 #[tokio::test]
 async fn test_mcp_error_response_creation() {
-    let handler = McpProtocolHandler::new();
+    let handler = McpProtocolHandlerImpl::new();
     let error_response = handler.create_error_response(
         json!(1), 
         -32601, 
@@ -95,7 +95,7 @@ async fn test_mcp_error_response_creation() {
 
 #[tokio::test]
 async fn test_mcp_protocol_version_mismatch() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     let init_message = json!({
         "jsonrpc": "2.0",
@@ -119,10 +119,11 @@ async fn test_mcp_protocol_version_mismatch() {
 
 #[tokio::test]
 async fn test_jsonrpc_error_response_for_unknown_method() {
-    use crate::protocol_impl::{McpProtocolHandler, McpError};
+    use crate::protocol_impl::{McpProtocolHandlerImpl, McpError};
+    use crate::protocol_testable::McpProtocolHandler;
     use serde_json::json;
 
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     let unknown_message = json!({
         "jsonrpc": "2.0",
         "id": 42,

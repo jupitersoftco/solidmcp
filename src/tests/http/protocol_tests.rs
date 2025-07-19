@@ -2,18 +2,24 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::http::{create_mcp_routes, McpHttpConfig};
+    use crate::http::HttpMcpHandler;
+    use crate::shared::SharedMcpHandler;
+    use crate::logging::{McpDebugLogger, McpConnectionId};
+    use std::sync::Arc;
     use warp::test::request;
     use serde_json::json;
 
     #[tokio::test]
     async fn test_jsonrpc_id_preserved() {
-        let config = McpHttpConfig::default();
-        let routes = create_mcp_routes(config);
+        let connection_id = McpConnectionId::new();
+        let logger = McpDebugLogger::new(connection_id);
+        let shared_handler = Arc::new(SharedMcpHandler::new(logger));
+        let http_handler = HttpMcpHandler::new(shared_handler);
+        let routes = http_handler.route();
         
         let resp = request()
             .method("POST")
-            .path("/mcp/v1/messages")
+            .path("/mcp")
             .json(&json!({
                 "jsonrpc": "2.0",
                 "id": 42,
@@ -36,14 +42,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_notification_no_response() {
-        let config = McpHttpConfig::default();
-        let routes = create_mcp_routes(config);
+    async fn test_notification_no_id() {
+        let connection_id = McpConnectionId::new();
+        let logger = McpDebugLogger::new(connection_id);
+        let shared_handler = Arc::new(SharedMcpHandler::new(logger));
+        let http_handler = HttpMcpHandler::new(shared_handler);
+        let routes = http_handler.route();
         
         // Notification has no id field
         let resp = request()
             .method("POST")
-            .path("/mcp/v1/messages")
+            .path("/mcp")
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "notifications/cancel",
@@ -62,13 +71,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_error_response_format() {
-        let config = McpHttpConfig::default();
-        let routes = create_mcp_routes(config);
+        let connection_id = McpConnectionId::new();
+        let logger = McpDebugLogger::new(connection_id);
+        let shared_handler = Arc::new(SharedMcpHandler::new(logger));
+        let http_handler = HttpMcpHandler::new(shared_handler);
+        let routes = http_handler.route();
         
         // Call tools/list without initialization
         let resp = request()
             .method("POST")
-            .path("/mcp/v1/messages")
+            .path("/mcp")
             .json(&json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -83,5 +95,34 @@ mod tests {
         assert!(body["error"].is_object());
         assert!(body["error"]["code"].is_number());
         assert!(body["error"]["message"].is_string());
+    }
+
+    #[tokio::test]
+    async fn test_content_type_headers() {
+        let connection_id = McpConnectionId::new();
+        let logger = McpDebugLogger::new(connection_id);
+        let shared_handler = Arc::new(SharedMcpHandler::new(logger));
+        let http_handler = HttpMcpHandler::new(shared_handler);
+        let routes = http_handler.route();
+        
+        let resp = request()
+            .method("POST")
+            .path("/mcp")
+            .header("content-type", "application/json")
+            .header("accept", "application/json")
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {}
+            }))
+            .reply(&routes)
+            .await;
+        
+        assert_eq!(resp.status(), 200);
+        assert_eq!(
+            resp.headers().get("content-type").unwrap(),
+            "application/json"
+        );
     }
 }

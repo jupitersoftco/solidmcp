@@ -4,13 +4,14 @@
 
 #[cfg(test)]
 use {
-    crate::protocol_impl::McpProtocolHandler,
+    crate::protocol_testable::McpProtocolHandler,
+    crate::protocol_impl::McpProtocolHandlerImpl,
     serde_json::json,
 };
 
 #[tokio::test]
 async fn test_mcp_tools_list() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     // Initialize first
     let init_message = json!({
@@ -56,7 +57,7 @@ async fn test_mcp_tools_list() {
 
 #[tokio::test]
 async fn test_mcp_tool_call() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     // Initialize first
     let init_message = json!({
@@ -101,7 +102,7 @@ async fn test_mcp_tool_call() {
 
 #[tokio::test]
 async fn test_mcp_tool_call_without_initialization() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     let tool_message = json!({
         "jsonrpc": "2.0",
@@ -122,7 +123,7 @@ async fn test_mcp_tool_call_without_initialization() {
 
 #[tokio::test]
 async fn test_mcp_unknown_tool() {
-    let mut handler = McpProtocolHandler::new();
+    let mut handler = McpProtocolHandlerImpl::new();
     
     // Initialize first
     let init_message = json!({

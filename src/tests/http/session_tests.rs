@@ -2,48 +2,52 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::http::session::SessionManager;
-    use uuid::Uuid;
+    use crate::http::session::{extract_session_id_from_cookie, generate_session_id};
 
-    #[tokio::test]
-    async fn test_session_creation() {
-        let manager = SessionManager::new();
-        let session_id = Uuid::new_v4().to_string();
+    #[test]
+    fn test_session_id_generation() {
+        let session_id = generate_session_id();
+        assert_eq!(session_id.len(), 32);
+        assert!(session_id.chars().all(|c| c.is_alphanumeric()));
         
-        let session = manager.get_or_create_session(&session_id).await;
-        assert_eq!(session.id, session_id);
-        assert!(!session.is_initialized);
+        // Test uniqueness
+        let session_id2 = generate_session_id();
+        assert_ne!(session_id, session_id2);
     }
 
-    #[tokio::test]
-    async fn test_session_isolation() {
-        let manager = SessionManager::new();
+    #[test]
+    fn test_extract_session_id_from_cookie() {
+        // Test with valid cookie
+        let cookie = Some("mcp_session=abc123def456; other=value".to_string());
+        let session_id = extract_session_id_from_cookie(&cookie);
+        assert_eq!(session_id, Some("abc123def456".to_string()));
         
-        let session1_id = Uuid::new_v4().to_string();
-        let session2_id = Uuid::new_v4().to_string();
+        // Test with session cookie only
+        let cookie = Some("mcp_session=xyz789".to_string());
+        let session_id = extract_session_id_from_cookie(&cookie);
+        assert_eq!(session_id, Some("xyz789".to_string()));
         
-        let session1 = manager.get_or_create_session(&session1_id).await;
-        let session2 = manager.get_or_create_session(&session2_id).await;
+        // Test with no session cookie
+        let cookie = Some("other=value; another=test".to_string());
+        let session_id = extract_session_id_from_cookie(&cookie);
+        assert_eq!(session_id, None);
         
-        // Sessions should be different instances
-        assert_ne!(session1.id, session2.id);
+        // Test with None cookie
+        let session_id = extract_session_id_from_cookie(&None);
+        assert_eq!(session_id, None);
     }
 
-    #[tokio::test]
-    async fn test_session_persistence() {
-        let manager = SessionManager::new();
-        let session_id = Uuid::new_v4().to_string();
-        
-        // Create session
-        {
-            let mut session = manager.get_or_create_session(&session_id).await;
-            session.is_initialized = true;
-        }
-        
-        // Retrieve same session
-        {
-            let session = manager.get_or_create_session(&session_id).await;
-            assert!(session.is_initialized);
-        }
+    #[test]
+    fn test_session_cookie_with_spaces() {
+        let cookie = Some("  mcp_session=test123  ; other=value".to_string());
+        let session_id = extract_session_id_from_cookie(&cookie);
+        assert_eq!(session_id, Some("test123".to_string()));
+    }
+
+    #[test]
+    fn test_multiple_cookies_with_session() {
+        let cookie = Some("first=1; mcp_session=found; last=3".to_string());
+        let session_id = extract_session_id_from_cookie(&cookie);
+        assert_eq!(session_id, Some("found".to_string()));
     }
 }
