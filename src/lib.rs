@@ -5,6 +5,7 @@
 
 // Re-export the main modules
 pub mod core;
+pub mod framework;
 pub mod handler;
 pub mod handlers;
 pub mod http;
@@ -13,7 +14,7 @@ pub mod protocol;
 pub mod protocol_impl;
 // Legacy trait removed - internal use only
 // pub mod protocol_testable;
-pub mod server;
+// Legacy server module removed - use framework module instead
 pub mod shared;
 pub mod tools;
 pub mod validation;
@@ -39,11 +40,8 @@ pub use handler::{
 // Re-export schemars for convenience
 pub use schemars::JsonSchema;
 
-// Re-export high-level server API (for convenience)
-pub use server::{
-    ExtendedToolDefinition, HighLevelMcpServer, McpPromptProvider, McpResourceProvider,
-    McpServerBuilder, McpTool, ServerCapabilities, ToolContext,
-};
+// Re-export new framework API
+pub use framework::{FrameworkHandler, McpServerBuilder, PromptProvider, ResourceProvider};
 
 // Re-export WebSocket handler for convenience
 pub use websocket::handle_mcp_ws_main as handle_mcp_ws;
