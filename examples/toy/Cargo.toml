@@ -11,14 +11,6 @@ path = "src/lib.rs"
 name = "toy-notes-server"
 path = "src/main.rs"
 
-[[bin]]
-name = "typed-notes-server"
-path = "src/typed_main.rs"
-
-[[bin]]
-name = "minimal-notes-server"
-path = "src/minimal_main.rs"
-
 [dependencies]
 solidmcp = { path = "../.." }
 anyhow = "1.0"

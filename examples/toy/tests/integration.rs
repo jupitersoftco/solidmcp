@@ -85,7 +85,7 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
 
     let context = TestNotesContext::new(notes_dir);
 
-    McpServerBuilder::new(context, "test-notes-server", "0.1.0")
+    McpServerBuilder::new(context, "toy-notes-server", "0.1.0")
         .with_tool(
             "add_note",
             "Add a new note",
@@ -215,7 +215,7 @@ async fn test_websocket_basic_flow() -> Result<()> {
     let parsed: Value = serde_json::from_str(&response)?;
 
     assert_eq!(parsed["result"]["protocolVersion"], "2025-06-18");
-    assert_eq!(parsed["result"]["serverInfo"]["name"], "test-notes-server");
+    assert_eq!(parsed["result"]["serverInfo"]["name"], "toy-notes-server");
 
     // Test add_note tool
     let add_note_request = json!({
