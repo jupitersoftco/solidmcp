@@ -89,32 +89,22 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
         .with_tool(
             "add_note",
             "Add a new note",
-            |input: AddNote, ctx: Arc<TestNotesContext>, mcp| {
-                let notification_sender = mcp.notification_sender.clone();
-                async move {
-                    ctx.save_note(&input.name, &input.content).await?;
+            |input: AddNote, ctx: Arc<TestNotesContext>, notify| async move {
+                ctx.save_note(&input.name, &input.content).await?;
 
-                    // Send notification
-                    if let Some(sender) = notification_sender {
-                        let _ = sender.send(solidmcp::McpNotification::LogMessage {
-                            level: LogLevel::Info,
-                            logger: Some("notes".to_string()),
-                            message: format!("Note '{}' added", input.name),
-                            data: None,
-                        });
-                    }
+                // Clean notification API
+                notify.info(&format!("Note '{}' added", input.name))?;
 
-                    Ok(AddNoteResult {
-                        message: format!("Note '{}' added successfully", input.name),
-                        success: true,
-                    })
-                }
+                Ok(AddNoteResult {
+                    message: format!("Note '{}' added successfully", input.name),
+                    success: true,
+                })
             },
         )
         .with_tool(
             "list_notes",
             "List all notes",
-            |_input: ListNotes, ctx: Arc<TestNotesContext>, _mcp| async move {
+            |_input: ListNotes, ctx: Arc<TestNotesContext>, _notify| async move {
                 let notes = ctx.list_notes().await;
                 Ok(ListNotesResult { notes })
             },
@@ -122,28 +112,17 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
         .with_tool(
             "send_notification",
             "Send a notification",
-            |input: SendNotification, _ctx: Arc<TestNotesContext>, mcp| {
-                let notification_sender = mcp.notification_sender.clone();
-                async move {
-                    let level = match input.level.as_str() {
-                        "debug" => LogLevel::Debug,
-                        "info" => LogLevel::Info,
-                        "warning" => LogLevel::Warning,
-                        "error" => LogLevel::Error,
-                        _ => return Err(anyhow::anyhow!("Invalid log level: {}", input.level)),
-                    };
-
-                    if let Some(sender) = notification_sender {
-                        let _ = sender.send(solidmcp::McpNotification::LogMessage {
-                            level,
-                            logger: Some("custom".to_string()),
-                            message: input.message,
-                            data: input.data,
-                        });
-                    }
-
-                    Ok(NotificationResult { success: true })
+            |input: SendNotification, _ctx: Arc<TestNotesContext>, notify| async move {
+                // Clean notification API
+                match input.level.as_str() {
+                    "debug" => notify.debug(&input.message)?,
+                    "info" => notify.info(&input.message)?,
+                    "warning" => notify.warn(&input.message)?,
+                    "error" => notify.error(&input.message)?,
+                    _ => return Err(anyhow::anyhow!("Invalid log level: {}", input.level)),
                 }
+
+                Ok(NotificationResult { success: true })
             },
         )
         .build()

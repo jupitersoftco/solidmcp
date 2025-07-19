@@ -162,32 +162,22 @@ async fn main() -> Result<()> {
             .with_tool(
                 "add_note",
                 "Save a note to the notes directory",
-                |input: AddNote, ctx: Arc<NotesContext>, mcp| {
-                    let notification_sender = mcp.notification_sender.clone();
-                    async move {
-                        ctx.save_note(&input.name, &input.content).await?;
+                |input: AddNote, ctx: Arc<NotesContext>, notify| async move {
+                    ctx.save_note(&input.name, &input.content).await?;
 
-                        // Send notification using cloned sender
-                        if let Some(sender) = notification_sender {
-                            let _ = sender.send(solidmcp::McpNotification::LogMessage {
-                                level: LogLevel::Info,
-                                logger: Some("notes".to_string()),
-                                message: format!("Note '{}' saved", input.name),
-                                data: None,
-                            });
-                        }
+                    // Clean notification API - no boilerplate!
+                    notify.info(&format!("Note '{}' saved", input.name))?;
 
-                        Ok(NoteResult {
-                            message: format!("Note '{}' saved successfully", input.name),
-                            timestamp: chrono::Utc::now().to_rfc3339(),
-                        })
-                    }
+                    Ok(NoteResult {
+                        message: format!("Note '{}' saved successfully", input.name),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    })
                 },
             )
             .with_tool(
                 "list_notes",
                 "List all available notes",
-                |_input: ListNotes, ctx: Arc<NotesContext>, _mcp| async move {
+                |_input: ListNotes, ctx: Arc<NotesContext>, _notify| async move {
                     let notes = ctx.list_notes().await;
                     Ok(NotesList {
                         count: notes.len(),
@@ -198,7 +188,7 @@ async fn main() -> Result<()> {
             .with_tool(
                 "read_note",
                 "Read the content of a specific note",
-                |input: ReadNote, ctx: Arc<NotesContext>, _mcp| async move {
+                |input: ReadNote, ctx: Arc<NotesContext>, _notify| async move {
                     if let Some(content) = ctx.get_note(&input.name).await {
                         Ok(NoteContent {
                             name: input.name,
@@ -213,61 +203,39 @@ async fn main() -> Result<()> {
             .with_tool(
                 "delete_note",
                 "Delete a note from the notes directory",
-                |input: DeleteNote, ctx: Arc<NotesContext>, mcp| {
-                    let notification_sender = mcp.notification_sender.clone();
-                    async move {
-                        if ctx.get_note(&input.name).await.is_none() {
-                            return Err(anyhow::anyhow!("Note not found: {}", input.name));
-                        }
-
-                        ctx.delete_note(&input.name).await?;
-
-                        // Send notification using cloned sender
-                        if let Some(sender) = notification_sender {
-                            let _ = sender.send(solidmcp::McpNotification::LogMessage {
-                                level: LogLevel::Info,
-                                logger: Some("notes".to_string()),
-                                message: format!("Note '{}' deleted", input.name),
-                                data: None,
-                            });
-                        }
-
-                        Ok(NoteResult {
-                            message: format!("Note '{}' deleted successfully", input.name),
-                            timestamp: chrono::Utc::now().to_rfc3339(),
-                        })
+                |input: DeleteNote, ctx: Arc<NotesContext>, notify| async move {
+                    if ctx.get_note(&input.name).await.is_none() {
+                        return Err(anyhow::anyhow!("Note not found: {}", input.name));
                     }
+
+                    ctx.delete_note(&input.name).await?;
+
+                    // Clean notification API - no boilerplate!
+                    notify.info(&format!("Note '{}' deleted", input.name))?;
+
+                    Ok(NoteResult {
+                        message: format!("Note '{}' deleted successfully", input.name),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    })
                 },
             )
             .with_tool(
                 "send_notification",
                 "Send a notification to the client",
-                |input: SendNotification, _ctx: Arc<NotesContext>, mcp| {
-                    let notification_sender = mcp.notification_sender.clone();
-                    async move {
-                        let level = match input.level.as_str() {
-                            "debug" => LogLevel::Debug,
-                            "info" => LogLevel::Info,
-                            "warning" => LogLevel::Warning,
-                            "error" => LogLevel::Error,
-                            _ => return Err(anyhow::anyhow!("Invalid log level: {}", input.level)),
-                        };
-
-                        // Send notification using cloned sender
-                        if let Some(sender) = notification_sender {
-                            let _ = sender.send(solidmcp::McpNotification::LogMessage {
-                                level,
-                                logger: Some("custom".to_string()),
-                                message: input.message,
-                                data: input.data,
-                            });
-                        }
-
-                        Ok(NotificationResult {
-                            success: true,
-                            sent_at: chrono::Utc::now().to_rfc3339(),
-                        })
+                |input: SendNotification, _ctx: Arc<NotesContext>, notify| async move {
+                    // Clean notification API with level matching
+                    match input.level.as_str() {
+                        "debug" => notify.debug(&input.message)?,
+                        "info" => notify.info(&input.message)?,
+                        "warning" => notify.warn(&input.message)?,
+                        "error" => notify.error(&input.message)?,
+                        _ => return Err(anyhow::anyhow!("Invalid log level: {}", input.level)),
                     }
+
+                    Ok(NotificationResult {
+                        success: true,
+                        sent_at: chrono::Utc::now().to_rfc3339(),
+                    })
                 },
             )
             .build()

@@ -17,11 +17,73 @@ use {
     serde::de::DeserializeOwned,
     serde_json::Value,
     std::{collections::HashMap, future::Future, pin::Pin, sync::Arc},
+    tokio::sync::mpsc,
 };
+
+/// Ergonomic notification context that eliminates boilerplate
+#[derive(Clone)]
+pub struct NotificationCtx {
+    sender: Option<mpsc::UnboundedSender<McpNotification>>,
+}
+
+impl NotificationCtx {
+    /// Create a new notification context from McpContext
+    pub fn from_mcp(mcp: &McpContext) -> Self {
+        Self {
+            sender: mcp.notification_sender.clone(),
+        }
+    }
+
+    /// Send an info notification with minimal syntax
+    pub fn info(&self, message: impl Into<String>) -> Result<()> {
+        self.log(LogLevel::Info, message, None::<Value>)
+    }
+
+    /// Send a debug notification
+    pub fn debug(&self, message: impl Into<String>) -> Result<()> {
+        self.log(LogLevel::Debug, message, None::<Value>)
+    }
+
+    /// Send a warning notification
+    pub fn warn(&self, message: impl Into<String>) -> Result<()> {
+        self.log(LogLevel::Warning, message, None::<Value>)
+    }
+
+    /// Send an error notification
+    pub fn error(&self, message: impl Into<String>) -> Result<()> {
+        self.log(LogLevel::Error, message, None::<Value>)
+    }
+
+    /// Send a log notification with optional data
+    pub fn log<T>(&self, level: LogLevel, message: impl Into<String>, data: Option<T>) -> Result<()>
+    where
+        T: serde::Serialize,
+    {
+        if let Some(sender) = &self.sender {
+            let data = data.map(|d| serde_json::to_value(d)).transpose()?;
+
+            sender.send(McpNotification::LogMessage {
+                level,
+                logger: Some("app".to_string()),
+                message: message.into(),
+                data,
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Notify that resources have changed
+    pub fn resources_changed(&self) -> Result<()> {
+        if let Some(sender) = &self.sender {
+            sender.send(McpNotification::ResourcesListChanged)?;
+        }
+        Ok(())
+    }
+}
 
 /// A tool function that can be called by the MCP client
 pub type ToolFunction<C> = Box<
-    dyn Fn(Value, Arc<C>, &McpContext) -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
+    dyn Fn(Value, Arc<C>, NotificationCtx) -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
         + Send
         + Sync,
 >;
@@ -54,34 +116,21 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
     where
         I: JsonSchema + DeserializeOwned + Send + 'static,
         O: JsonSchema + serde::Serialize + Send + 'static,
-        F: Fn(I, Arc<C>, &McpContext) -> Fut + Send + Sync + 'static,
+        F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<O>> + Send + 'static,
     {
         let tool_def = ToolDefinition::from_schema::<I>(name, description);
         let handler = Arc::new(handler);
 
-        let wrapper: ToolFunction<C> = Box::new(move |args, context, mcp_context| {
+        let wrapper: ToolFunction<C> = Box::new(move |args, context, notification_ctx| {
             let handler = Arc::clone(&handler);
-            // Extract the data we need from mcp_context instead of trying to clone it
-            let session_id = mcp_context.session_id.clone();
-            let protocol_version = mcp_context.protocol_version.clone();
-            let client_info = mcp_context.client_info.clone();
-            let notification_sender = mcp_context.notification_sender.clone();
 
             Box::pin(async move {
                 // Parse and validate input
                 let input: I = serde_json::from_value(args)?;
 
-                // Reconstruct a context for the handler
-                let reconstructed_context = McpContext {
-                    session_id,
-                    protocol_version,
-                    client_info,
-                    notification_sender,
-                };
-
-                // Call the handler
-                let output = handler(input, context, &reconstructed_context).await?;
+                // Call the handler with clean API
+                let output = handler(input, context, notification_ctx).await?;
 
                 // Serialize output
                 Ok(serde_json::to_value(output)?)
@@ -179,7 +228,8 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
 
     async fn call_tool(&self, name: &str, arguments: Value, context: &McpContext) -> Result<Value> {
         if let Some((_, tool_fn)) = self.registry.tools.get(name) {
-            tool_fn(arguments, self.context.clone(), context).await
+            let notification_ctx = NotificationCtx::from_mcp(context);
+            tool_fn(arguments, self.context.clone(), notification_ctx).await
         } else {
             Err(anyhow::anyhow!("Tool not found: {}", name))
         }
@@ -248,7 +298,7 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
     where
         I: JsonSchema + DeserializeOwned + Send + 'static,
         O: JsonSchema + serde::Serialize + Send + 'static,
-        F: Fn(I, Arc<C>, &McpContext) -> Fut + Send + Sync + 'static,
+        F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<O>> + Send + 'static,
     {
         self.handler
