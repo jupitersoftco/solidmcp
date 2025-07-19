@@ -3,7 +3,7 @@
 //! HTTP transport for MCP protocol messages.
 
 use {
-    super::shared::SharedMcpHandler,
+    super::shared::McpProtocolEngine,
     super::validation::McpValidator,
     anyhow::Result,
     serde_json::{json, Value},
@@ -14,12 +14,12 @@ use {
 };
 
 pub struct HttpMcpHandler {
-    shared_handler: Arc<SharedMcpHandler>,
+    protocol_engine: Arc<McpProtocolEngine>,
 }
 
 impl HttpMcpHandler {
-    pub fn new(shared_handler: Arc<SharedMcpHandler>) -> Self {
-        Self { shared_handler }
+    pub fn new(protocol_engine: Arc<McpProtocolEngine>) -> Self {
+        Self { protocol_engine }
     }
 
     pub fn route(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
@@ -30,14 +30,14 @@ impl HttpMcpHandler {
             .and(warp::header::optional::<String>("accept"))
             .and(warp::header::optional::<String>("connection"))
             .and(warp::header::optional::<String>("cookie"))
-            .and(with_handler(self.shared_handler.clone()))
+            .and(with_handler(self.protocol_engine.clone()))
             .and_then(handle_mcp_http)
     }
 }
 
 fn with_handler(
-    handler: Arc<SharedMcpHandler>,
-) -> impl Filter<Extract = (Arc<SharedMcpHandler>,), Error = std::convert::Infallible> + Clone {
+    handler: Arc<McpProtocolEngine>,
+) -> impl Filter<Extract = (Arc<McpProtocolEngine>,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || handler.clone())
 }
 
@@ -47,7 +47,7 @@ async fn handle_mcp_http(
     accept: Option<String>,
     connection: Option<String>,
     cookie: Option<String>,
-    handler: Arc<SharedMcpHandler>,
+    handler: Arc<McpProtocolEngine>,
 ) -> Result<impl Reply, Rejection> {
     let content_type = content_type.unwrap_or_else(|| "application/json".to_string());
     let accept = accept.unwrap_or_else(|| "application/json".to_string());

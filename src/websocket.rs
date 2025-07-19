@@ -5,7 +5,7 @@
 use {
     super::logging::McpConnectionId,
     super::logging::McpDebugLogger,
-    super::shared::SharedMcpHandler,
+    super::shared::McpProtocolEngine,
     anyhow::Result,
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
@@ -18,7 +18,7 @@ use {
 pub async fn handle_mcp_ws_main(ws: Ws) -> Result<impl Reply, Rejection> {
     // For now, we'll create a new shared handler for each WebSocket connection
     // In a more robust implementation, we'd pass this from the server
-    let shared_handler = Arc::new(SharedMcpHandler::new());
+    let protocol_engine = Arc::new(McpProtocolEngine::new());
 
     Ok(ws.on_upgrade(move |websocket| async move {
         let connection_id = McpConnectionId::new();
@@ -29,7 +29,7 @@ pub async fn handle_mcp_ws_main(ws: Ws) -> Result<impl Reply, Rejection> {
             connection_id
         );
 
-        handle_mcp_ws(websocket, logger, shared_handler.clone()).await;
+        handle_mcp_ws(websocket, logger, protocol_engine.clone()).await;
 
         info!("🔌 MCP WebSocket connection closed: {:?}", connection_id);
     }))
@@ -39,7 +39,7 @@ pub async fn handle_mcp_ws_main(ws: Ws) -> Result<impl Reply, Rejection> {
 async fn handle_mcp_ws(
     websocket: WebSocket,
     logger: McpDebugLogger,
-    shared_handler: Arc<SharedMcpHandler>,
+    protocol_engine: Arc<McpProtocolEngine>,
 ) {
     let (mut ws_sender, mut ws_receiver) = websocket.split();
     let session_id = format!("ws-{}", logger.connection_id().0);
@@ -56,7 +56,7 @@ async fn handle_mcp_ws(
 
                     match serde_json::from_str::<Value>(text) {
                         Ok(message) => {
-                            match shared_handler
+                            match protocol_engine
                                 .handle_message(message.clone(), Some(session_id.clone()))
                                 .await
                             {

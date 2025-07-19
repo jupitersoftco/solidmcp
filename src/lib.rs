@@ -37,8 +37,8 @@ pub use handler::{
 
 // Re-export high-level server API (for convenience)
 pub use server::{
-    HighLevelMcpServer, McpPromptProvider, McpResourceProvider, McpServerBuilder, McpTool,
-    ServerCapabilities, ToolContext,
+    ExtendedToolDefinition, HighLevelMcpServer, McpPromptProvider, McpResourceProvider,
+    McpServerBuilder, McpTool, ServerCapabilities, ToolContext,
 };
 
 // Re-export WebSocket handler for convenience

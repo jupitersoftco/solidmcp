@@ -7,7 +7,7 @@ use {
     super::http::HttpMcpHandler,
     super::logging::McpDebugLogger,
     super::protocol::McpProtocol,
-    super::shared::SharedMcpHandler,
+    super::shared::McpProtocolEngine,
     anyhow::{Context, Result},
     std::sync::Arc,
     tracing::info,
@@ -16,31 +16,31 @@ use {
 
 pub struct McpServer {
     protocol: McpProtocol,
-    shared_handler: Arc<SharedMcpHandler>,
+    protocol_engine: Arc<McpProtocolEngine>,
 }
 
 impl McpServer {
     /// Create a new MCP server instance
     pub async fn new() -> Result<Self> {
         let protocol = McpProtocol::new();
-        let shared_handler = Arc::new(SharedMcpHandler::new());
+        let protocol_engine = Arc::new(McpProtocolEngine::new());
 
         info!("🚀 Initializing MCP Server");
         Ok(Self {
             protocol,
-            shared_handler,
+            protocol_engine,
         })
     }
 
     /// Create a new MCP server instance with a custom handler
     pub async fn with_handler(handler: Arc<dyn super::handler::McpHandler>) -> Result<Self> {
         let protocol = McpProtocol::new();
-        let shared_handler = Arc::new(SharedMcpHandler::with_handler(handler));
+        let protocol_engine = Arc::new(McpProtocolEngine::with_handler(handler));
 
         info!("🚀 Initializing MCP Server with custom handler");
         Ok(Self {
             protocol,
-            shared_handler,
+            protocol_engine,
         })
     }
 
@@ -49,7 +49,7 @@ impl McpServer {
         info!("🚀 Starting MCP Server on port {}", port);
 
         // Create HTTP handler
-        let http_handler = HttpMcpHandler::new(self.shared_handler.clone());
+        let http_handler = HttpMcpHandler::new(self.protocol_engine.clone());
 
         // Combine WebSocket and HTTP routes on the same /mcp path
         let ws_route = warp::path!("mcp")
