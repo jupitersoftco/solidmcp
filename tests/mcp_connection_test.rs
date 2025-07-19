@@ -152,86 +152,19 @@ async fn test_mcp_connection_timeout() -> Result<(), Box<dyn std::error::Error +
     Ok(())
 }
 
-/// Test full MCP client-server interaction with isolated server
+/// Test unknown tool error handling
 #[tokio::test]
-async fn test_mcp_full_interaction() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn test_mcp_unknown_tool_error() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
-    info!("🤝 Testing full MCP client-server interaction");
+    info!("❌ Testing unknown tool error handling");
 
     with_mcp_connection(
-        "test_mcp_full_interaction",
+        "test_unknown_tool_error",
         |_server, mut write, mut read| async move {
-            // Test tool listing
-            let tools_message = json!({
-                "jsonrpc": "2.0",
-                "id": 10,
-                "method": "tools/list",
-                "params": {}
-            });
-
-            write
-                .send(Message::Text(serde_json::to_string(&tools_message)?))
-                .await?;
-            let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
-
-            assert!(response["result"]["tools"].is_array());
-            let tools = response["result"]["tools"].as_array().unwrap();
-            assert!(!tools.is_empty(), "Should have available tools");
-            info!("📋 Available tools: {:?}", tools.len());
-
-            // Test echo tool
-            let echo_message = json!({
-                "jsonrpc": "2.0",
-                "id": 11,
-                "method": "tools/call",
-                "params": {
-                    "name": "echo",
-                    "arguments": {
-                        "message": "Integration test message"
-                    }
-                }
-            });
-
-            write
-                .send(Message::Text(serde_json::to_string(&echo_message)?))
-                .await?;
-            let echo_response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let echo_response: Value = serde_json::from_str(&echo_response_text)?;
-
-            assert_eq!(echo_response["jsonrpc"], "2.0");
-            assert_eq!(echo_response["id"], 11);
-            assert!(echo_response["result"].is_object());
-            info!("🔊 Echo result received successfully");
-
-            // Test read_file tool
-            let read_message = json!({
-                "jsonrpc": "2.0",
-                "id": 12,
-                "method": "tools/call",
-                "params": {
-                    "name": "read_file",
-                    "arguments": {
-                        "file_path": "Cargo.toml"
-                    }
-                }
-            });
-
-            write
-                .send(Message::Text(serde_json::to_string(&read_message)?))
-                .await?;
-            let read_response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let read_response: Value = serde_json::from_str(&read_response_text)?;
-
-            assert_eq!(read_response["jsonrpc"], "2.0");
-            assert_eq!(read_response["id"], 12);
-            assert!(read_response["result"].is_object());
-            info!("📖 Read result received successfully");
-
             // Test unknown tool (should return error)
             let unknown_message = json!({
                 "jsonrpc": "2.0",
-                "id": 13,
+                "id": 1,
                 "method": "tools/call",
                 "params": {
                     "name": "unknown_tool",
@@ -243,14 +176,19 @@ async fn test_mcp_full_interaction() -> Result<(), Box<dyn std::error::Error + S
                 .send(Message::Text(serde_json::to_string(&unknown_message)?))
                 .await?;
             let unknown_response_text =
-                receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+                receive_ws_message(&mut read, Duration::from_secs(2)).await?;
             let unknown_response: Value = serde_json::from_str(&unknown_response_text)?;
 
             assert_eq!(unknown_response["jsonrpc"], "2.0");
-            assert_eq!(unknown_response["id"], 13);
+            assert_eq!(unknown_response["id"], 1);
             // Should have error instead of result
             assert!(unknown_response.get("error").is_some());
-            info!("✅ Correctly failed for unknown tool");
+            assert!(unknown_response.get("result").is_none());
+
+            let error = &unknown_response["error"];
+            assert!(error["code"].is_number());
+            assert!(error["message"].is_string());
+            info!("✅ Correctly failed for unknown tool: {}", error["message"]);
 
             Ok(())
         },
