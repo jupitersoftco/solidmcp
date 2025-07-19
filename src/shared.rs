@@ -6,7 +6,7 @@
 use {
     super::protocol_impl::McpProtocolHandlerImpl,
     anyhow::Result,
-    serde_json::Value,
+    serde_json::{json, Value},
     std::collections::HashMap,
     std::sync::Arc,
     tokio::sync::Mutex,
@@ -92,6 +92,16 @@ impl McpProtocolEngine {
                     // Get the result from the custom handler's initialize method
                     // Note: We can't mutate the handler through the trait, but the CustomMcpHandler
                     // in server.rs returns a static response anyway
+
+                    // Check if already initialized
+                    if protocol_handler.initialized {
+                        return self.create_error_response(
+                            message.get("id").cloned(),
+                            -32603,
+                            "Already initialized",
+                        );
+                    }
+
                     match custom_handler.initialize(params, &context).await {
                         Ok(result) => {
                             // Mark session as initialized in the protocol handler
@@ -316,5 +326,17 @@ impl McpProtocolEngine {
 
         // Fall back to built-in protocol handler
         protocol_handler.handle_message(message).await
+    }
+
+    /// Create an error response following JSON-RPC 2.0 format
+    fn create_error_response(&self, id: Option<Value>, code: i32, message: &str) -> Result<Value> {
+        Ok(json!({
+            "jsonrpc": "2.0",
+            "id": id.unwrap_or(Value::Null),
+            "error": {
+                "code": code,
+                "message": message
+            }
+        }))
     }
 }

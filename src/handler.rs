@@ -3,7 +3,10 @@
 //! Core trait that users must implement to provide MCP functionality.
 //! This is the main integration point for the solidmcp library.
 
-use {anyhow::Result, async_trait::async_trait, serde_json::Value, tokio::sync::mpsc};
+use {
+    anyhow::Result, async_trait::async_trait, schemars::JsonSchema, serde_json::Value,
+    tokio::sync::mpsc,
+};
 
 /// Context provided to MCP handler methods
 #[derive(Clone)]
@@ -56,12 +59,82 @@ pub enum LogLevel {
     Error,
 }
 
-/// Tool definition for MCP tools/list response
+/// Tool definition for MCP tools/list response using schemars JsonSchema
+/// This is a type-erased version for storing multiple tools with different input types
 #[derive(Debug, Clone)]
 pub struct ToolDefinition {
     pub name: String,
     pub description: String,
     pub input_schema: Value,
+}
+
+impl ToolDefinition {
+    /// Create a new tool definition from a JsonSchema type
+    pub fn from_schema<T: JsonSchema>(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
+        let schema = schemars::schema_for!(T);
+        let input_schema = serde_json::to_value(schema).unwrap_or_else(|_| {
+            serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        });
+
+        Self {
+            name: name.into(),
+            description: description.into(),
+            input_schema,
+        }
+    }
+
+    /// Convert to the JSON format expected by MCP protocol
+    pub fn to_json(&self) -> Value {
+        serde_json::json!({
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.input_schema
+        })
+    }
+}
+
+/// Typed tool definition helper that provides compile-time type safety
+/// Use this for creating individual tools, then convert to ToolDefinition for collections
+#[derive(Debug, Clone)]
+pub struct TypedToolDefinition<T: JsonSchema> {
+    pub name: String,
+    pub description: String,
+    pub input_schema: std::marker::PhantomData<T>,
+}
+
+impl<T: JsonSchema> TypedToolDefinition<T> {
+    /// Create a new typed tool definition
+    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            input_schema: std::marker::PhantomData,
+        }
+    }
+
+    /// Convert to a type-erased ToolDefinition for collections
+    pub fn to_tool_definition(&self) -> ToolDefinition {
+        ToolDefinition::from_schema::<T>(self.name.clone(), self.description.clone())
+    }
+
+    /// Get the JSON schema for this tool's input
+    pub fn get_input_schema(&self) -> Value {
+        let schema = schemars::schema_for!(T);
+        serde_json::to_value(schema).unwrap_or_else(|_| {
+            serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        })
+    }
 }
 
 /// Resource information for MCP resources/list response

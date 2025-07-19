@@ -23,7 +23,7 @@ async fn find_available_port() -> u16 {
 async fn test_websocket_connection_and_init() -> Result<()> {
     // Start server on random port
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
@@ -31,7 +31,7 @@ async fn test_websocket_connection_and_init() -> Result<()> {
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     // Connect via WebSocket
-    let url = format!("ws://127.0.0.1:{}/mcp", port);
+    let url = format!("ws://127.0.0.1:{port}/mcp");
     let (ws_stream, _) = connect_async(&url).await?;
     let (mut write, mut read) = ws_stream.split();
 
@@ -72,13 +72,13 @@ async fn test_websocket_connection_and_init() -> Result<()> {
 #[tokio::test]
 async fn test_websocket_message_ordering() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("ws://127.0.0.1:{}/mcp", port);
+    let url = format!("ws://127.0.0.1:{port}/mcp");
     let (ws_stream, _) = connect_async(&url).await?;
     let (mut write, mut read) = ws_stream.split();
 
@@ -132,13 +132,13 @@ async fn test_websocket_message_ordering() -> Result<()> {
 #[tokio::test]
 async fn test_websocket_ping_pong() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("ws://127.0.0.1:{}/mcp", port);
+    let url = format!("ws://127.0.0.1:{port}/mcp");
     let (ws_stream, _) = connect_async(&url).await?;
     let (mut write, mut read) = ws_stream.split();
 
@@ -165,13 +165,13 @@ async fn test_websocket_ping_pong() -> Result<()> {
 #[tokio::test]
 async fn test_websocket_close_handling() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("ws://127.0.0.1:{}/mcp", port);
+    let url = format!("ws://127.0.0.1:{port}/mcp");
     let (ws_stream, _) = connect_async(&url).await?;
     let (mut write, mut read) = ws_stream.split();
 
@@ -209,20 +209,20 @@ async fn test_websocket_close_handling() -> Result<()> {
 #[tokio::test]
 async fn test_websocket_large_messages() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("ws://127.0.0.1:{}/mcp", port);
+    let url = format!("ws://127.0.0.1:{port}/mcp");
     let (ws_stream, _) = connect_async(&url).await?;
     let (mut write, mut read) = ws_stream.split();
 
     // Create large message
     let mut large_array = Vec::new();
     for i in 0..10000 {
-        large_array.push(format!("item_{}", i));
+        large_array.push(format!("item_{i}"));
     }
 
     let large_request = json!({
@@ -259,7 +259,7 @@ async fn test_websocket_large_messages() -> Result<()> {
 #[tokio::test]
 async fn test_concurrent_websocket_connections() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
@@ -269,7 +269,7 @@ async fn test_concurrent_websocket_connections() -> Result<()> {
     let mut handles = vec![];
 
     for client_id in 0..5 {
-        let url = format!("ws://127.0.0.1:{}/mcp", port);
+        let url = format!("ws://127.0.0.1:{port}/mcp");
 
         let handle = tokio::spawn(async move {
             let (ws_stream, _) = connect_async(&url).await?;
@@ -333,13 +333,13 @@ async fn test_concurrent_websocket_connections() -> Result<()> {
 #[tokio::test]
 async fn test_websocket_reconnection() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("ws://127.0.0.1:{}/mcp", port);
+    let url = format!("ws://127.0.0.1:{port}/mcp");
 
     // First connection
     {

@@ -33,8 +33,11 @@ pub use tools::McpTools;
 // Re-export core handler trait and types
 pub use handler::{
     LogLevel, McpContext, McpHandler, McpNotification, PromptArgument, PromptContent, PromptInfo,
-    PromptMessage, ResourceContent, ResourceInfo, ToolDefinition,
+    PromptMessage, ResourceContent, ResourceInfo, ToolDefinition, TypedToolDefinition,
 };
+
+// Re-export schemars for convenience
+pub use schemars::JsonSchema;
 
 // Re-export high-level server API (for convenience)
 pub use server::{

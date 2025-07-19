@@ -23,13 +23,13 @@ async fn find_available_port() -> u16 {
 #[tokio::test]
 async fn test_concurrent_http_clients() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("http://127.0.0.1:{}/mcp", port);
+    let url = format!("http://127.0.0.1:{port}/mcp");
     let client_count = 20;
     let requests_per_client = 10;
 
@@ -64,7 +64,7 @@ async fn test_concurrent_http_clients() -> Result<()> {
                 }
             });
 
-            let session_cookie = format!("mcp_session=client_{}", client_id);
+            let session_cookie = format!("mcp_session=client_{client_id}");
 
             let response = client
                 .post(&url)
@@ -123,13 +123,13 @@ async fn test_concurrent_http_clients() -> Result<()> {
 #[tokio::test]
 async fn test_session_isolation_concurrent() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("http://127.0.0.1:{}/mcp", port);
+    let url = format!("http://127.0.0.1:{port}/mcp");
 
     // Create two clients with different sessions
     let client1 = reqwest::Client::new();
@@ -231,14 +231,14 @@ async fn test_mixed_protocol_clients() -> Result<()> {
     use tokio_tungstenite::{connect_async, tungstenite::Message};
 
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let http_url = format!("http://127.0.0.1:{}/mcp", port);
-    let ws_url = format!("ws://127.0.0.1:{}/mcp", port);
+    let http_url = format!("http://127.0.0.1:{port}/mcp");
+    let ws_url = format!("ws://127.0.0.1:{port}/mcp");
 
     let barrier = Arc::new(Barrier::new(2));
 
@@ -341,13 +341,13 @@ async fn test_mixed_protocol_clients() -> Result<()> {
 #[tokio::test]
 async fn test_high_load_handling() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("http://127.0.0.1:{}/mcp", port);
+    let url = format!("http://127.0.0.1:{port}/mcp");
     let client = reqwest::Client::new();
 
     // Initialize
@@ -403,7 +403,7 @@ async fn test_high_load_handling() -> Result<()> {
     }
 
     let elapsed = start.elapsed();
-    println!("Processed 1000 requests in {:?}", elapsed);
+    println!("Processed 1000 requests in {elapsed:?}");
 
     server_handle.abort();
     Ok(())
@@ -413,18 +413,18 @@ async fn test_high_load_handling() -> Result<()> {
 #[tokio::test]
 async fn test_client_reconnection_handling() -> Result<()> {
     let port = find_available_port().await;
-    let server = McpServer::new().await?;
+    let mut server = McpServer::new().await?;
 
     let server_handle = tokio::spawn(async move { server.start(port).await });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    let url = format!("http://127.0.0.1:{}/mcp", port);
+    let url = format!("http://127.0.0.1:{port}/mcp");
 
     // Simulate multiple connect/disconnect cycles
     for cycle in 0..10 {
         let client = reqwest::Client::new();
-        let session_id = format!("reconnect_test_{}", cycle);
+        let session_id = format!("reconnect_test_{cycle}");
 
         // Initialize
         let init = json!({
@@ -438,7 +438,7 @@ async fn test_client_reconnection_handling() -> Result<()> {
 
         let response = client
             .post(&url)
-            .header("Cookie", format!("mcp_session={}", session_id))
+            .header("Cookie", format!("mcp_session={session_id}"))
             .json(&init)
             .send()
             .await?;
@@ -456,7 +456,7 @@ async fn test_client_reconnection_handling() -> Result<()> {
 
             let response = client
                 .post(&url)
-                .header("Cookie", format!("mcp_session={}", session_id))
+                .header("Cookie", format!("mcp_session={session_id}"))
                 .json(&request)
                 .send()
                 .await?;

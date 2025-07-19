@@ -11,12 +11,17 @@ path = "src/lib.rs"
 name = "toy-notes-server"
 path = "src/main.rs"
 
+[[bin]]
+name = "typed-notes-server"
+path = "src/typed_main.rs"
+
 [dependencies]
 solidmcp = { path = "../.." }
 anyhow = "1.0"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 notify = "6.1"
+schemars = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.36", features = ["full"] }

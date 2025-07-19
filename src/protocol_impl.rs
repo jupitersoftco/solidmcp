@@ -55,7 +55,16 @@ impl McpProtocolHandlerImpl {
 
 impl McpProtocolHandlerImpl {
     pub async fn handle_message(&mut self, message: Value) -> Result<Value> {
-        // Validate required fields
+        // Validate required JSON-RPC fields
+        let jsonrpc = message
+            .get("jsonrpc")
+            .and_then(|j| j.as_str())
+            .ok_or_else(|| McpError::Internal("Missing or invalid 'jsonrpc' field".to_string()))?;
+
+        if jsonrpc != "2.0" {
+            return Err(McpError::Internal(format!("Invalid jsonrpc version: {jsonrpc}")).into());
+        }
+
         let method = message
             .get("method")
             .and_then(|m| m.as_str())
@@ -87,6 +96,7 @@ impl McpProtocolHandlerImpl {
             "tools/call" => self.handle_tool_call(params).await,
             "notifications/cancel" => self.handle_cancel(params).await,
             "notifications/initialized" => self.handle_initialized_notification().await,
+            "notifications/message" => self.handle_logging_notification(params).await,
             _ => {
                 error!("[PROTOCOL] Unknown method: {:?} (id={:?})", method, id);
                 Err(McpError::UnknownMethod(method.to_string()).into())
@@ -268,7 +278,9 @@ impl McpProtocolHandlerImpl {
             return Err(McpError::NotInitialized.into());
         }
 
-        let tool_name = params["name"].as_str().unwrap_or("");
+        let tool_name = params["name"].as_str().ok_or_else(|| {
+            McpError::InvalidParams("Missing required 'name' field for tool call".to_string())
+        })?;
         let arguments = params["arguments"].clone();
 
         debug!(
@@ -300,6 +312,25 @@ impl McpProtocolHandlerImpl {
     /// Handle initialized notification
     async fn handle_initialized_notification(&mut self) -> Result<Value> {
         info!("✅ MCP client sent initialized notification");
+        Ok(json!({}))
+    }
+
+    /// Handle logging notification
+    async fn handle_logging_notification(&mut self, params: Value) -> Result<Value> {
+        let level = params
+            .get("level")
+            .and_then(|l| l.as_str())
+            .unwrap_or("info");
+        let message = params.get("message").and_then(|m| m.as_str()).unwrap_or("");
+
+        match level {
+            "error" => error!("📝 [CLIENT LOG] {}", message),
+            "warn" => info!("📝 [CLIENT LOG] WARN: {}", message),
+            "info" => info!("📝 [CLIENT LOG] {}", message),
+            "debug" => debug!("📝 [CLIENT LOG] {}", message),
+            _ => info!("📝 [CLIENT LOG] [{}]: {}", level, message),
+        }
+
         Ok(json!({}))
     }
 }

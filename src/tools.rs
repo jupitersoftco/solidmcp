@@ -137,7 +137,10 @@ impl McpTools {
 
     /// Echo handler for MCP
     async fn handle_echo(params: Value) -> Result<Value> {
-        let message = params["message"].as_str().unwrap_or("").to_string();
+        let message = params["message"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter 'message'"))?
+            .to_string();
         debug!("🔊 Echo request received: '{}'", message);
 
         let response = json!({ "echo": message });
