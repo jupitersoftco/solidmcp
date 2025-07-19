@@ -18,7 +18,7 @@ Add SolidMCP to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-solidmcp = { git = "https://github.com/yourusername/solidmcp.git" }
+solidmcp = { git = "https://github.com/jupitersoftco/solidmcp.git" }
 anyhow = "1.0"
 schemars = "0.8"
 serde = { version = "1.0", features = ["derive"] }
