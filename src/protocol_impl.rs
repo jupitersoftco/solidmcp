@@ -20,6 +20,8 @@ pub enum McpError {
     UnknownTool(String),
     #[error("Client not initialized")]
     NotInitialized,
+    #[error("Invalid params: {0}")]
+    InvalidParams(String),
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -72,7 +74,17 @@ impl McpProtocolHandler for McpProtocolHandlerImpl {
         );
 
         let result = match method {
-            "initialize" => self.handle_initialize(params).await,
+            "initialize" => {
+                // Initialize method requires params field to be present
+                if message.get("params").is_none() {
+                    Err(McpError::InvalidParams(
+                        "Missing params field for initialize method".to_string(),
+                    )
+                    .into())
+                } else {
+                    self.handle_initialize(params).await
+                }
+            }
             "tools/list" => self.handle_tools_list().await,
             "tools/call" => self.handle_tool_call(params).await,
             "notifications/cancel" => self.handle_cancel(params).await,
@@ -105,6 +117,7 @@ impl McpProtocolHandler for McpProtocolHandlerImpl {
                             (-32601, "Method not found")
                         }
                         McpError::NotInitialized => (-32002, "Not initialized"),
+                        McpError::InvalidParams(msg) => (-32602, msg.as_str()),
                         McpError::Internal(msg) => (-32603, msg.as_str()),
                     }
                 } else {

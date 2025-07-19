@@ -191,17 +191,8 @@ impl McpValidator {
             return Err(errors);
         }
 
-        // Validate tool name
-        if let Some(name) = &tool_params.name {
-            let valid_tools = ["echo", "read_file"];
-            if !valid_tools.contains(&name.as_str()) {
-                error!("❌ Unknown tool: {}", name);
-                return Err(vec![format!(
-                    "Unknown tool: {}. Available tools: {:?}",
-                    name, valid_tools
-                )]);
-            }
-        }
+        // Tool name validation is handled by the protocol handler
+        // to ensure proper JSON-RPC error responses
 
         Ok(())
     }

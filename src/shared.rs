@@ -1,27 +1,38 @@
-//! MCP Shared Handler
+//! MCP Protocol Engine
 //!
-//! Shared MCP protocol logic that can be used by both WebSocket and HTTP transports.
+//! Core protocol routing and session management for MCP messages.
+//! Routes JSON-RPC messages to user-provided handler implementations.
 
 use {
     super::protocol_impl::McpProtocolHandlerImpl, super::protocol_testable::McpProtocolHandler,
     anyhow::Result, serde_json::Value, std::collections::HashMap, std::sync::Arc,
-    tokio::sync::Mutex, tracing::debug,
+    tokio::sync::Mutex,
 };
 
-pub struct SharedMcpHandler {
+pub struct McpProtocolEngine {
     // Maintain protocol handlers per session ID for proper client isolation
     session_handlers: Arc<Mutex<HashMap<String, McpProtocolHandlerImpl>>>,
+    // Handler implementation for MCP functionality
+    handler: Option<Arc<dyn super::handler::McpHandler>>,
 }
 
-impl SharedMcpHandler {
+impl McpProtocolEngine {
     pub fn new() -> Self {
         Self {
             session_handlers: Arc::new(Mutex::new(HashMap::new())),
+            handler: None,
+        }
+    }
+
+    pub fn with_handler(handler: Arc<dyn super::handler::McpHandler>) -> Self {
+        Self {
+            session_handlers: Arc::new(Mutex::new(HashMap::new())),
+            handler: Some(handler),
         }
     }
 }
 
-impl SharedMcpHandler {
+impl McpProtocolEngine {
     /// Handle an MCP message and return the response
     /// This is the core logic that works for both WebSocket and HTTP
     /// Maintains initialization state per session/client
@@ -30,24 +41,8 @@ impl SharedMcpHandler {
         message: Value,
         session_id: Option<String>, // Session ID for client isolation
     ) -> Result<Value> {
-        debug!(
-            "📥 Full MCP message: {}",
-            serde_json::to_string_pretty(&message).unwrap_or_else(|_| "invalid json".to_string())
-        );
         let method = message["method"].as_str().unwrap_or("");
-        let _id = message["id"].clone();
         let params = message["params"].clone();
-        let message_clone = message.clone();
-        debug!(
-            "📥 Processing MCP method: {} (session: {:?})",
-            method, session_id
-        );
-        debug!("📥 Method: {}", method);
-        debug!("📥 ID: {:?}", _id);
-        debug!(
-            "📥 Params: {}",
-            serde_json::to_string_pretty(&params).unwrap_or_else(|_| "invalid json".to_string())
-        );
 
         // Get or create protocol handler for this session
         let mut sessions = self.session_handlers.lock().await;
@@ -56,42 +51,31 @@ impl SharedMcpHandler {
             .unwrap_or(&"default".to_string())
             .clone();
 
-        debug!(
-            "[SESSION] handle_message called with session_id: {:?} (session_key: {})",
-            session_id, session_key
-        );
-        let protocol_handler = sessions.entry(session_key.clone()).or_insert_with(|| {
-            debug!(
-                "[SESSION] Creating new protocol handler for session_key: {}",
-                session_key
-            );
-            McpProtocolHandlerImpl::new()
-        });
+        let protocol_handler = sessions
+            .entry(session_key.clone())
+            .or_insert_with(|| McpProtocolHandlerImpl::new());
 
-        debug!(
-            "🚦 Using protocol handler for session: {} (initialized: {})",
-            session_key,
-            protocol_handler.is_initialized()
-        );
+        // If we have a custom handler, delegate to it for supported methods
+        if let Some(ref custom_handler) = self.handler {
+            match method {
+                "initialize" => {
+                    // TODO: Call custom_handler.initialize() and update protocol_handler state
+                    // For now, fall back to built-in handler
+                }
+                "tools/list" => {
+                    // TODO: Call custom_handler.list_tools()
+                    // For now, fall back to built-in handler
+                }
+                "tools/call" => {
+                    // TODO: Call custom_handler.call_tool()
+                    // For now, fall back to built-in handler
+                }
+                // Add other methods as needed
+                _ => {}
+            }
+        }
 
-        // Process the message
-        let result = protocol_handler.handle_message(message_clone).await;
-        debug!(
-            "🚦 Protocol handler returned for session: {} method: {} result: {:?}",
-            session_key, method, result
-        );
-        result
-    }
-
-    #[cfg(test)]
-    pub async fn clear_sessions(&self) {
-        let mut sessions = self.session_handlers.lock().await;
-        sessions.clear();
-    }
-}
-
-impl Default for SharedMcpHandler {
-    fn default() -> Self {
-        Self::new()
+        // Fall back to built-in protocol handler
+        protocol_handler.handle_message(message).await
     }
 }

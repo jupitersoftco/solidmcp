@@ -32,6 +32,18 @@ impl McpServer {
         })
     }
 
+    /// Create a new MCP server instance with a custom handler
+    pub async fn with_handler(handler: Arc<dyn super::handler::McpHandler>) -> Result<Self> {
+        let protocol = McpProtocol::new();
+        let shared_handler = Arc::new(SharedMcpHandler::with_handler(handler));
+
+        info!("🚀 Initializing MCP Server with custom handler");
+        Ok(Self {
+            protocol,
+            shared_handler,
+        })
+    }
+
     /// Start the MCP server (WebSocket + HTTP)
     pub async fn start(&mut self, port: u16) -> Result<()> {
         info!("🚀 Starting MCP Server on port {}", port);
@@ -46,8 +58,13 @@ impl McpServer {
 
         let http_route = http_handler.route();
 
+        // Add health check endpoint
+        let health_route = warp::path!("health")
+            .and(warp::get())
+            .map(|| warp::reply::with_status("OK", warp::http::StatusCode::OK));
+
         // Combine routes - warp will handle content negotiation
-        let routes = ws_route.or(http_route);
+        let routes = ws_route.or(http_route).or(health_route);
 
         let addr = format!("127.0.0.1:{port}")
             .parse::<std::net::SocketAddr>()

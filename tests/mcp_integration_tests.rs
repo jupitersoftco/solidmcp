@@ -18,7 +18,10 @@ async fn test_mcp_http_integration() {
 
     with_mcp_test_server("http_integration", |server| async move {
         let port = server.port;
-        let client = reqwest::Client::new();
+        let client = reqwest::ClientBuilder::new()
+            .cookie_store(true)
+            .build()
+            .expect("Failed to build HTTP client");
 
         // Wait for server to be ready
         let mut attempts = 0;
@@ -172,7 +175,10 @@ async fn test_mcp_protocol_compliance() {
 
     with_mcp_test_server("protocol_compliance", |server| async move {
         let port = server.port;
-        let client = reqwest::Client::new();
+        let client = reqwest::ClientBuilder::new()
+            .cookie_store(true)
+            .build()
+            .expect("Failed to build HTTP client");
 
         // Wait for server to be ready
         let mut attempts = 0;
@@ -223,7 +229,7 @@ async fn test_mcp_protocol_compliance() {
         // Should return error (not necessarily 400, depends on implementation)
         assert!(!response.status().is_success());
 
-        // Test 2: Missing method
+        // Test 2: Missing method - should return HTTP 400
         let missing_method_request = json!({
             "jsonrpc": "2.0",
             "id": 1
@@ -237,10 +243,10 @@ async fn test_mcp_protocol_compliance() {
             .await
             .expect("Failed to send missing method request");
 
-        // Should return error for missing method
-        assert!(!response.status().is_success());
+        // Missing method field should return HTTP 400
+        assert_eq!(response.status(), 400);
 
-        // Test 3: Unsupported method
+        // Test 3: Unsupported method - should return JSON-RPC error in body with 200 OK
         let unsupported_request = json!({
             "jsonrpc": "2.0",
             "id": 1,
@@ -255,8 +261,11 @@ async fn test_mcp_protocol_compliance() {
             .await
             .expect("Failed to send unsupported method request");
 
-        // Should return error for unsupported method
-        assert!(!response.status().is_success());
+        // Should return 200 OK with JSON-RPC error in body
+        assert!(response.status().is_success());
+        let error_response: serde_json::Value = response.json().await?;
+        assert!(error_response["error"].is_object());
+        assert_eq!(error_response["error"]["code"], -32601); // Method not found
 
         Ok(())
     })
@@ -271,7 +280,10 @@ async fn test_mcp_tool_execution() {
 
     with_mcp_test_server("tool_execution", |server| async move {
         let port = server.port;
-        let client = reqwest::Client::new();
+        let client = reqwest::ClientBuilder::new()
+            .cookie_store(true)
+            .build()
+            .expect("Failed to build HTTP client");
 
         // Initialize first
         let init_request = json!({
