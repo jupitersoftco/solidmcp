@@ -173,11 +173,13 @@ async fn test_toy_server_read_resource() -> Result<()> {
     let read_response: Value = response.json().await?;
 
     // Check content
-    let content = read_response["result"]["content"].as_str().unwrap();
+    let contents = read_response["result"]["contents"].as_array().unwrap();
+    assert_eq!(contents.len(), 1);
+    let content = contents[0]["text"].as_str().unwrap();
     assert_eq!(content, "# Test Note\n\nThis is test content.");
 
     // Check mime type
-    let mime_type = read_response["result"]["mimeType"].as_str().unwrap();
+    let mime_type = contents[0]["mimeType"].as_str().unwrap();
     assert_eq!(mime_type, "text/markdown");
 
     println!("✅ Resource reading works correctly!");

@@ -4,7 +4,6 @@
 
 use {
     super::protocol::McpProtocol,
-    super::protocol_testable::McpProtocolHandler,
     super::tools::McpTools,
     anyhow::Result,
     serde_json::{json, Value},
@@ -28,9 +27,9 @@ pub enum McpError {
 
 pub struct McpProtocolHandlerImpl {
     protocol: McpProtocol,
-    initialized: bool,
-    client_info: Option<Value>,
-    protocol_version: Option<String>,
+    pub initialized: bool,
+    pub client_info: Option<Value>,
+    pub protocol_version: Option<String>,
 }
 
 impl McpProtocolHandlerImpl {
@@ -54,9 +53,8 @@ impl McpProtocolHandlerImpl {
     }
 }
 
-#[async_trait::async_trait]
-impl McpProtocolHandler for McpProtocolHandlerImpl {
-    async fn handle_message(&mut self, message: Value) -> Result<Value> {
+impl McpProtocolHandlerImpl {
+    pub async fn handle_message(&mut self, message: Value) -> Result<Value> {
         // Validate required fields
         let method = message
             .get("method")
@@ -138,15 +136,15 @@ impl McpProtocolHandler for McpProtocolHandlerImpl {
         }
     }
 
-    fn is_initialized(&self) -> bool {
+    pub fn is_initialized(&self) -> bool {
         self.initialized
     }
 
-    fn protocol_version(&self) -> &str {
+    pub fn protocol_version(&self) -> &str {
         self.protocol.version()
     }
 
-    fn create_error_response(&self, id: Value, code: i32, message: &str) -> Value {
+    pub fn create_error_response(&self, id: Value, code: i32, message: &str) -> Value {
         self.protocol.create_error_response(id, code, message)
     }
 }
@@ -297,21 +295,6 @@ impl McpProtocolHandlerImpl {
     async fn handle_initialized_notification(&mut self) -> Result<Value> {
         info!("✅ MCP client sent initialized notification");
         Ok(json!({}))
-    }
-
-    fn is_initialized(&self) -> bool {
-        self.initialized
-    }
-
-    fn protocol_version(&self) -> &str {
-        // Return the negotiated protocol version or default to the server's version
-        self.protocol_version
-            .as_deref()
-            .unwrap_or(self.protocol.version())
-    }
-
-    fn create_error_response(&self, id: Value, code: i32, message: &str) -> Value {
-        self.protocol.create_error_response(id, code, message)
     }
 }
 

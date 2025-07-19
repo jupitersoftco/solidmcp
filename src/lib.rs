@@ -11,7 +11,8 @@ pub mod http;
 pub mod logging;
 pub mod protocol;
 pub mod protocol_impl;
-pub mod protocol_testable;
+// Legacy trait removed - internal use only
+// pub mod protocol_testable;
 pub mod server;
 pub mod shared;
 pub mod tools;
@@ -26,7 +27,7 @@ pub mod tests;
 pub use core::McpServer;
 pub use protocol::McpProtocol;
 pub use protocol_impl::McpProtocolHandlerImpl;
-pub use protocol_testable::McpProtocolHandler;
+// Legacy trait removed - McpProtocolHandler is now internal
 pub use tools::McpTools;
 
 // Re-export core handler trait and types

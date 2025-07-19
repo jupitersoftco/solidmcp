@@ -3,10 +3,7 @@
 //! Tests for MCP tools functionality like tools/list and tools/call.
 
 #[cfg(test)]
-use {
-    crate::protocol_impl::McpProtocolHandlerImpl, crate::protocol_testable::McpProtocolHandler,
-    serde_json::json,
-};
+use {crate::protocol_impl::McpProtocolHandlerImpl, serde_json::json};
 
 #[tokio::test]
 async fn test_mcp_tools_list() {

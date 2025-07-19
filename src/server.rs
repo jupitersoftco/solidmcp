@@ -193,15 +193,11 @@ impl CustomMcpHandler {
     fn get_capabilities(&self) -> Value {
         let mut capabilities = json!({});
 
-        // Add tools capability if we have tools
-        // Note: We use blocking_read() here which is safe because this is called
-        // during initialization before any async operations begin
-        let tools_count = self.tools.blocking_read().len();
-        if tools_count > 0 {
-            capabilities["tools"] = json!({
-                "listChanged": false
-            });
-        }
+        // Add tools capability - we always have tools since they're added during build
+        // This avoids the need for blocking_read() in async context
+        capabilities["tools"] = json!({
+            "listChanged": false
+        });
 
         // Add resources capability if we have a resource provider
         if self.resource_provider.is_some() {
@@ -385,7 +381,7 @@ impl CustomMcpHandler {
 
 #[async_trait]
 impl McpHandler for CustomMcpHandler {
-    async fn initialize(&mut self, params: Value, context: &McpContext) -> Result<Value> {
+    async fn initialize(&self, _params: Value, _context: &McpContext) -> Result<Value> {
         Ok(json!({
             "protocolVersion": "2025-06-18",
             "capabilities": self.get_capabilities(),

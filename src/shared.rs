@@ -5,7 +5,6 @@
 
 use {
     super::protocol_impl::McpProtocolHandlerImpl,
-    super::protocol_testable::McpProtocolHandler,
     anyhow::Result,
     serde_json::Value,
     std::collections::HashMap,
@@ -89,10 +88,34 @@ impl McpProtocolEngine {
                         .get("params")
                         .unwrap_or(&serde_json::Value::Null)
                         .clone();
-                    let handler_mut = Arc::clone(custom_handler);
-                    // Since we can't get a mutable reference to the trait object directly,
-                    // we'll need to use interior mutability or redesign this
-                    // For now, fall back to built-in handler for initialize
+
+                    // Get the result from the custom handler's initialize method
+                    // Note: We can't mutate the handler through the trait, but the CustomMcpHandler
+                    // in server.rs returns a static response anyway
+                    match custom_handler.initialize(params, &context).await {
+                        Ok(result) => {
+                            // Mark session as initialized in the protocol handler
+                            protocol_handler.initialized = true;
+                            if let Some(client_version) = message
+                                .get("params")
+                                .and_then(|p| p.get("protocolVersion"))
+                                .and_then(|v| v.as_str())
+                            {
+                                protocol_handler.protocol_version =
+                                    Some(client_version.to_string());
+                            }
+
+                            let response = serde_json::json!({
+                                "jsonrpc": "2.0",
+                                "id": message.get("id"),
+                                "result": result
+                            });
+                            return Ok(response);
+                        }
+                        Err(e) => {
+                            return Err(anyhow::anyhow!("Initialize error: {}", e));
+                        }
+                    }
                 }
                 "tools/list" => match custom_handler.list_tools(&context).await {
                     Ok(tools) => {

@@ -3,10 +3,7 @@
 //! Tests for MCP notification handling like cancel notifications.
 
 #[cfg(test)]
-use {
-    crate::protocol_impl::McpProtocolHandlerImpl, crate::protocol_testable::McpProtocolHandler,
-    serde_json::json,
-};
+use {crate::protocol_impl::McpProtocolHandlerImpl, serde_json::json};
 
 #[tokio::test]
 async fn test_mcp_cancel_notification() {

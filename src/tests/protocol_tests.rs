@@ -3,10 +3,7 @@
 //! Tests for basic MCP protocol functionality like initialization and error handling.
 
 #[cfg(test)]
-use {
-    crate::protocol_impl::McpProtocolHandlerImpl, crate::protocol_testable::McpProtocolHandler,
-    serde_json::json,
-};
+use {crate::protocol_impl::McpProtocolHandlerImpl, serde_json::json};
 
 #[tokio::test]
 async fn test_mcp_protocol_handler_creation() {
@@ -134,7 +131,6 @@ async fn test_mcp_protocol_version_mismatch() {
 #[tokio::test]
 async fn test_jsonrpc_error_response_for_unknown_method() {
     use crate::protocol_impl::McpProtocolHandlerImpl;
-    use crate::protocol_testable::McpProtocolHandler;
     use serde_json::json;
 
     let mut handler = McpProtocolHandlerImpl::new();

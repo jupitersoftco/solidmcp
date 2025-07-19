@@ -1,0 +1,444 @@
+    Blocking waiting for file lock on build directory
+warning: unused variable: `params`
+  --> src/shared.rs:88:25
+   |
+88 |                     let params = message
+   |                         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_params`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `handler_mut`
+  --> src/shared.rs:92:25
+   |
+92 |                     let handler_mut = Arc::clone(custom_handler);
+   |                         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_handler_mut`
+
+warning: unused variable: `context`
+   --> src/handler.rs:118:51
+    |
+118 |     async fn initialize(&mut self, params: Value, context: &McpContext) -> Result<Value> {
+    |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `params`
+   --> src/handler.rs:118:36
+    |
+118 |     async fn initialize(&mut self, params: Value, context: &McpContext) -> Result<Value> {
+    |                                    ^^^^^^ help: if this is intentional, prefix it with an underscore: `_params`
+
+warning: unused variable: `context`
+   --> src/handler.rs:140:36
+    |
+140 |     async fn list_resources(&self, context: &McpContext) -> Result<Vec<ResourceInfo>> {
+    |                                    ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `context`
+   --> src/handler.rs:147:46
+    |
+147 |     async fn read_resource(&self, uri: &str, context: &McpContext) -> Result<ResourceContent> {
+    |                                              ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `context`
+   --> src/handler.rs:153:34
+    |
+153 |     async fn list_prompts(&self, context: &McpContext) -> Result<Vec<PromptInfo>> {
+    |                                  ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `context`
+   --> src/handler.rs:164:9
+    |
+164 |         context: &McpContext,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `arguments`
+   --> src/handler.rs:163:9
+    |
+163 |         arguments: Option<Value>,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_arguments`
+
+warning: unused variable: `context`
+   --> src/handler.rs:171:56
+    |
+171 |     async fn cancel_notification(&self, params: Value, context: &McpContext) -> Result<Value> {
+    |                                                        ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `params`
+   --> src/handler.rs:171:41
+    |
+171 |     async fn cancel_notification(&self, params: Value, context: &McpContext) -> Result<Value> {
+    |                                         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_params`
+
+warning: unused variable: `context`
+   --> src/handler.rs:178:40
+    |
+178 |     async fn handle_initialized(&self, context: &McpContext) -> Result<()> {
+    |                                        ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `context`
+   --> src/server.rs:388:51
+    |
+388 |     async fn initialize(&mut self, params: Value, context: &McpContext) -> Result<Value> {
+    |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `params`
+   --> src/server.rs:388:36
+    |
+388 |     async fn initialize(&mut self, params: Value, context: &McpContext) -> Result<Value> {
+    |                                    ^^^^^^ help: if this is intentional, prefix it with an underscore: `_params`
+
+warning: function `generate_session_id` is never used
+   --> src/http.rs:274:4
+    |
+274 | fn generate_session_id() -> String {
+    |    ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: methods `is_initialized`, `protocol_version`, and `create_error_response` are never used
+   --> src/protocol_impl.rs:302:8
+    |
+154 | impl McpProtocolHandlerImpl {
+    | --------------------------- methods in this implementation
+...
+302 |     fn is_initialized(&self) -> bool {
+    |        ^^^^^^^^^^^^^^
+...
+306 |     fn protocol_version(&self) -> &str {
+    |        ^^^^^^^^^^^^^^^^
+...
+313 |     fn create_error_response(&self, id: Value, code: i32, message: &str) -> Value {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_receiver` is never read
+   --> src/server.rs:144:5
+    |
+142 | pub struct HighLevelMcpServer {
+    |            ------------------ field in this struct
+143 |     custom_handler: Arc<CustomMcpHandler>,
+144 |     notification_receiver: mpsc::UnboundedReceiver<McpNotification>,
+    |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> src/server.rs:185:12
+    |
+183 | impl CustomMcpHandler {
+    | --------------------- methods in this implementation
+184 |     /// Send a notification
+185 |     pub fn send_notification(&self, notification: McpNotification) -> Result<()> {
+    |            ^^^^^^^^^^^^^^^^^
+...
+229 |     async fn handle_tools_list(&self) -> Result<Value> {
+    |              ^^^^^^^^^^^^^^^^^
+...
+249 |     async fn handle_tool_call(&self, name: &str, arguments: Value) -> Result<Value> {
+    |              ^^^^^^^^^^^^^^^^
+...
+271 |     async fn handle_resources_list(&self) -> Result<Value> {
+    |              ^^^^^^^^^^^^^^^^^^^^^
+...
+300 |     async fn handle_resource_read(&self, uri: &str) -> Result<Value> {
+    |              ^^^^^^^^^^^^^^^^^^^^
+...
+318 |     async fn handle_prompts_list(&self) -> Result<Value> {
+    |              ^^^^^^^^^^^^^^^^^^^
+...
+360 |     async fn handle_prompt_get(&self, name: &str, arguments: Option<Value>) -> Result<Value> {
+    |              ^^^^^^^^^^^^^^^^^
+
+warning: `solidmcp` (lib) generated 18 warnings
+   Compiling solidmcp v0.1.0 (/Users/anon/dev/solidmcp)
+   Compiling toy-notes-server v0.1.0 (/Users/anon/dev/solidmcp/examples/toy)
+warning: methods `is_initialized`, `protocol_version`, and `create_error_response` are never used
+   --> src/protocol_impl.rs:302:8
+    |
+154 | impl McpProtocolHandlerImpl {
+    | --------------------------- methods in this implementation
+...
+302 |     fn is_initialized(&self) -> bool {
+    |        ^^^^^^^^^^^^^^
+...
+306 |     fn protocol_version(&self) -> &str {
+    |        ^^^^^^^^^^^^^^^^
+...
+313 |     fn create_error_response(&self, id: Value, code: i32, message: &str) -> Value {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `solidmcp` (lib test) generated 17 warnings (16 duplicates)
+warning: unused variable: `builder`
+  --> tests/regression_tool_registration_test.rs:78:9
+   |
+78 |     let builder = McpServerBuilder::new().add_tool(tool1).add_tool(tool2);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_builder`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: `solidmcp` (test "regression_tool_registration_test") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.85s
+     Running unittests src/lib.rs (target/debug/deps/solidmcp-19dbe0b8b297e6fc)
+
+running 39 tests
+test http::tests::test_effective_session_id_logic ... ok
+test http::tests::test_generate_session_id_format ... ok
+test http::tests::test_extract_session_id_from_cookie ... ok
+test protocol::tests::test_success_response ... ok
+test protocol::tests::test_initialize_response ... ok
+test protocol::tests::test_error_response ... ok
+test http::tests::test_generate_session_id_uniqueness ... ok
+test http::tests::test_create_error_reply_format ... ok
+test tests::http::session_tests::tests::test_extract_session_id_from_cookie ... ok
+test tests::http::session_tests::tests::test_multiple_cookies_with_session ... ok
+test tests::http::session_tests::tests::test_session_cookie_with_spaces ... ok
+test tests::http::handler_tests::tests::test_invalid_json_returns_error ... ok
+test tests::http::handler_tests::tests::test_get_method_not_allowed ... ok
+test tests::http::session_tests::tests::test_session_id_generation ... ok
+test tests::notifications_tests::test_mcp_cancel_notification ... ok
+test tests::http::protocol_tests::tests::test_notification_no_id ... ok
+test tests::notifications_tests::test_mcp_cancel_notification_with_id ... ok
+test tests::http::protocol_tests::tests::test_jsonrpc_id_preserved ... ok
+test tests::protocol_tests::test_jsonrpc_error_response_for_unknown_method ... ok
+test tests::protocol_tests::test_mcp_error_response_creation ... ok
+test tests::http::protocol_tests::tests::test_error_response_format ... ok
+test tests::http::handler_tests::tests::test_http_endpoint_exists ... ok
+test tests::http::protocol_tests::tests::test_content_type_headers ... ok
+test tests::protocol_tests::test_mcp_initialize ... ok
+test tests::protocol_tests::test_mcp_protocol_handler_creation ... ok
+test tests::protocol_tests::test_mcp_tools_list_without_initialization ... ok
+test tests::protocol_tests::test_mcp_protocol_version_mismatch ... ok
+test tests::tests::test_mcp_initialize ... ok
+test tests::tests::test_mcp_echo_tool ... ok
+test tests::protocol_tests::test_mcp_unknown_method ... ok
+test tests::tests::test_mcp_message_handling ... ok
+test tests::tests::test_mcp_server_creation ... ok
+test tests::tests::test_mcp_tools_list ... ok
+test tests::tools_tests::test_mcp_tool_call_without_initialization ... ok
+test tests::tools_tests::test_mcp_tool_call ... ok
+test tests::tools_tests::test_mcp_unknown_tool ... ok
+test tests::tools_tests::test_mcp_tools_list ... ok
+test tests::tests::test_mcp_read_file_tool ... ok
+test tests::tests::test_mcp_read_file_handler ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/solidmcp-863a3004259eb635)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mcp_basic_integration.rs (target/debug/deps/mcp_basic_integration-09496cf447bf12ec)
+
+running 6 tests
+test test_mcp_protocol_messages ... ok
+test test_mcp_handlers ... ok
+test test_mcp_server_basic_functionality ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/mcp_connection_test.rs (target/debug/deps/mcp_connection_test-c31f89a5a3a4ef0d)
+
+running 8 tests
+test test_mcp_connection_timeout ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test test_mcp_unknown_tool_error ... ok
+test test_mcp_connection_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_mcp_connection_basic ... ok
+test test_mcp_connection_malformed has been running for over 60 seconds
+test test_mcp_connection_malformed ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 75.03s
+
+     Running tests/mcp_debugging_test.rs (target/debug/deps/mcp_debugging_test-575f078d509a4c02)
+
+running 4 tests
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_mcp_comprehensive_debugging ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+
+     Running tests/mcp_error_handling_test.rs (target/debug/deps/mcp_error_handling_test-8cde4160ede62b2c)
+
+running 8 tests
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test test_mcp_concurrent_messages ... ok
+test test_mcp_large_messages ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_mcp_error_codes ... ok
+test test_mcp_connection_interruption ... ok
+test test_mcp_connection_stress ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+     Running tests/mcp_http_integration_test.rs (target/debug/deps/mcp_http_integration_test-cbbe44353aadef10)
+
+running 7 tests
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_mcp_websocket_still_works ... ok
+test test_mcp_http_error_handling ... ok
+test test_mcp_http_integration ... ok
+test test_mcp_dual_transport ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/mcp_http_session_test.rs (target/debug/deps/mcp_http_session_test-6eca148282de1563)
+
+running 9 tests
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_http_notifications_without_session ... ok
+test test_http_tool_execution_stateless ... ok
+test test_http_default_session_fallback ... ok
+test test_http_session_cookie_still_works ... ok
+test test_http_concurrent_stateless_clients ... ok
+test test_http_initialize_consistent_session ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/mcp_integration_tests.rs (target/debug/deps/mcp_integration_tests-ff4390a39fd5e5e0)
+
+running 6 tests
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_mcp_tool_execution ... ok
+test test_mcp_protocol_compliance ... ok
+test test_mcp_http_integration ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+     Running tests/mcp_notification_test.rs (target/debug/deps/mcp_notification_test-9e7b02349f366474)
+
+running 2 tests
+test test_notification_tool_validation ... ok
+test test_notification_tool_execution ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+     Running tests/mcp_protocol_test.rs (target/debug/deps/mcp_protocol_test-7a7240ea6614458f)
+
+running 8 tests
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test test_mcp_protocol_version ... ok
+test test_mcp_protocol_initialize ... ok
+test test_jsonrpc_compliance ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_mcp_protocol_ordering ... ok
+test test_mcp_protocol_malformed ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/mcp_test_helpers.rs (target/debug/deps/mcp_test_helpers-98b2f9672f27db37)
+
+running 3 tests
+test tests::test_mcp_test_server_lifecycle ... ok
+test tests::test_with_mcp_test_server ... ok
+test tests::test_with_mcp_connection ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/mcp_tools_test.rs (target/debug/deps/mcp_tools_test-c3de6267522d4651)
+
+running 10 tests
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test test_mcp_websocket_empty_message_parse_error ... ok
+test test_mcp_tools_no_init ... ok
+test test_mcp_tools_echo ... ok
+test test_mcp_tools_list ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_mcp_tool_argument_validation ... ok
+test test_mcp_tools_unknown ... ok
+test test_mcp_tools_read_file ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/mcp_trait_implementation_test.rs (target/debug/deps/mcp_trait_implementation_test-0fb3aa7a6d2d225c)
+
+running 5 tests
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_trait_error_handling ... ok
+test test_custom_trait_implementation ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+     Running tests/regression_capabilities_test.rs (target/debug/deps/regression_capabilities_test-af456372fae7f32f)
+
+running 6 tests
+test test_empty_capabilities ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_capabilities_with_tools ... ok
+test test_capabilities_match_features ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/regression_server_info_test.rs (target/debug/deps/regression_server_info_test-63d0cc78d8d26ba1)
+
+running 6 tests
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+test test_server_info_correctness ... ok
+test test_protocol_version_negotiation ... ok
+test test_reinitialization_handling ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+     Running tests/regression_tool_registration_test.rs (target/debug/deps/regression_tool_registration_test-681b8429b443c7b2)
+
+running 5 tests
+test test_builder_tool_count ... ok
+test test_tools_available_immediately ... ok
+test mcp_test_helpers::tests::test_mcp_test_server_lifecycle ... ok
+test mcp_test_helpers::tests::test_with_mcp_test_server ... ok
+test mcp_test_helpers::tests::test_with_mcp_connection ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src/lib.rs (target/debug/deps/toy_notes_server-8417c69d7f2b9361)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/toy_notes_server-b23ade1b3d9438a0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/http_session_integration.rs (target/debug/deps/http_session_integration-b652831e49ae686c)
+
+running 3 tests
+test test_toy_server_notifications_stateless ... ok
+test test_toy_server_stateless_http_client ... ok
+test test_toy_server_concurrent_stateless_clients ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+
+     Running tests/integration.rs (target/debug/deps/integration-7ef915c4f51ade3f)
+
+running 4 tests
+test test_notes_directory_creation ... ok
+test test_toy_server_note_storage ... ok
+test test_toy_server_end_to_end ... ok
+test test_toy_server_http_endpoint ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+
+     Running tests/resource_integration.rs (target/debug/deps/resource_integration-d4a760a4b72b833c)

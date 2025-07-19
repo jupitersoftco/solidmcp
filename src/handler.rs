@@ -48,7 +48,7 @@ pub enum McpNotification {
 }
 
 /// Log levels for log message notifications
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LogLevel {
     Debug,
     Info,
@@ -115,7 +115,7 @@ pub struct PromptMessage {
 pub trait McpHandler: Send + Sync {
     /// Initialize the handler with client information
     /// Called when a client sends an initialize request
-    async fn initialize(&mut self, params: Value, context: &McpContext) -> Result<Value> {
+    async fn initialize(&self, _params: Value, _context: &McpContext) -> Result<Value> {
         // Default implementation returns basic capabilities
         Ok(serde_json::json!({
             "protocolVersion": "2025-06-18",
@@ -137,20 +137,20 @@ pub trait McpHandler: Send + Sync {
 
     /// List available resources
     /// Called when a client sends a resources/list request
-    async fn list_resources(&self, context: &McpContext) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: &McpContext) -> Result<Vec<ResourceInfo>> {
         // Default implementation - no resources
         Ok(vec![])
     }
 
     /// Read a resource
     /// Called when a client sends a resources/read request
-    async fn read_resource(&self, uri: &str, context: &McpContext) -> Result<ResourceContent> {
+    async fn read_resource(&self, uri: &str, _context: &McpContext) -> Result<ResourceContent> {
         Err(anyhow::anyhow!("Resource not found: {}", uri))
     }
 
     /// List available prompts
     /// Called when a client sends a prompts/list request
-    async fn list_prompts(&self, context: &McpContext) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, _context: &McpContext) -> Result<Vec<PromptInfo>> {
         // Default implementation - no prompts
         Ok(vec![])
     }
@@ -160,22 +160,22 @@ pub trait McpHandler: Send + Sync {
     async fn get_prompt(
         &self,
         name: &str,
-        arguments: Option<Value>,
-        context: &McpContext,
+        _arguments: Option<Value>,
+        _context: &McpContext,
     ) -> Result<PromptContent> {
         Err(anyhow::anyhow!("Prompt not found: {}", name))
     }
 
     /// Handle notification cancellation
     /// Called when a client sends a notifications/cancel request
-    async fn cancel_notification(&self, params: Value, context: &McpContext) -> Result<Value> {
+    async fn cancel_notification(&self, _params: Value, _context: &McpContext) -> Result<Value> {
         // Default implementation - acknowledge cancellation
         Ok(serde_json::json!({}))
     }
 
     /// Handle initialized notification
     /// Called when a client sends a notifications/initialized notification
-    async fn handle_initialized(&self, context: &McpContext) -> Result<()> {
+    async fn handle_initialized(&self, _context: &McpContext) -> Result<()> {
         // Default implementation - do nothing
         Ok(())
     }

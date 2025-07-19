@@ -17,10 +17,6 @@ struct DummyTool {
 
 #[async_trait]
 impl McpTool for DummyTool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
     fn definition(&self) -> ExtendedToolDefinition {
         ExtendedToolDefinition {
             name: self.name.clone(),
@@ -48,7 +44,7 @@ async fn test_tools_available_immediately() -> Result<()> {
     let mut builder = McpServerBuilder::new();
     for i in 0..5 {
         builder = builder.add_tool(DummyTool {
-            name: format!("tool_{}", i),
+            name: format!("tool_{i}"),
         });
     }
 
