@@ -2,8 +2,11 @@
 //!
 //! Tests for Model Context Protocol server functionality.
 
+pub mod capability_negotiation_tests;
 pub mod error_handling_tests;
+pub mod handler_trait_tests;
 pub mod http;
+pub mod jsonrpc_compliance_tests;
 pub mod notifications_tests;
 pub mod protocol_parsing_tests;
 pub mod protocol_tests;

@@ -176,8 +176,22 @@ mod tests {
         let result = handler.handle_message(supported_version).await.unwrap();
         assert_eq!(result["result"]["protocolVersion"], "2025-06-18");
 
-        // Test with unsupported version (should still work but negotiate)
+        // Test with another supported version
         let mut handler2 = McpProtocolHandlerImpl::new();
+        let supported_version2 = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26"
+            }
+        });
+
+        let result = handler2.handle_message(supported_version2).await.unwrap();
+        assert_eq!(result["result"]["protocolVersion"], "2025-03-26");
+
+        // Test with unsupported version (should error)
+        let mut handler3 = McpProtocolHandlerImpl::new();
         let unsupported_version = json!({
             "jsonrpc": "2.0",
             "id": 1,
@@ -187,9 +201,9 @@ mod tests {
             }
         });
 
-        let result = handler2.handle_message(unsupported_version).await.unwrap();
-        // Should return the client's requested version
-        assert_eq!(result["result"]["protocolVersion"], "2024-01-01");
+        let result = handler3.handle_message(unsupported_version).await.unwrap();
+        assert!(result.get("error").is_some());
+        assert_eq!(result["error"]["code"], -32603); // Internal error
     }
 
     /// Test notification handling

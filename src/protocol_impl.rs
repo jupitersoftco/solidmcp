@@ -159,6 +159,12 @@ impl McpProtocolHandlerImpl {
         );
         info!("   📋 Current initialized state: {}", self.initialized);
 
+        // Check if already initialized
+        if self.initialized {
+            error!("❌ [INIT] Already initialized! Rejecting second initialization attempt");
+            return Err(McpError::Internal("Already initialized".to_string()).into());
+        }
+
         // Store client info if provided
         if let Some(client_info) = params.get("clientInfo") {
             self.client_info = Some(client_info.clone());

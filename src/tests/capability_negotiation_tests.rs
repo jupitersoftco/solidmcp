@@ -5,7 +5,7 @@
 #[cfg(test)]
 mod tests {
     use crate::protocol_impl::McpProtocolHandlerImpl;
-    use serde_json::{json, Value};
+    use serde_json::json;
 
     /// Test basic capability negotiation
     #[tokio::test]
@@ -38,10 +38,10 @@ mod tests {
         let result = handler.handle_message(init_request).await.unwrap();
         assert_eq!(result["jsonrpc"], "2.0");
         assert_eq!(result["id"], 1);
-        
+
         let capabilities = &result["result"]["capabilities"];
         assert!(capabilities.is_object());
-        
+
         // Server should advertise its capabilities
         if let Some(tools) = capabilities.get("tools") {
             assert!(tools.is_object());
@@ -78,7 +78,7 @@ mod tests {
 
         let result = handler.handle_message(init_request).await.unwrap();
         let server_caps = &result["result"]["capabilities"];
-        
+
         // Server should only advertise what it actually supports
         // Built-in handler supports tools but may not support all advanced features
         assert!(server_caps.get("tools").is_some());
@@ -102,19 +102,19 @@ mod tests {
         let result = handler.handle_message(supported_version).await.unwrap();
         assert_eq!(result["result"]["protocolVersion"], "2025-06-18");
 
-        // Test with different version - should still work but echo client's version
+        // Test with another supported version
         let mut handler2 = McpProtocolHandlerImpl::new();
         let different_version = json!({
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
             "params": {
-                "protocolVersion": "2024-12-01"
+                "protocolVersion": "2025-03-26"
             }
         });
 
         let result = handler2.handle_message(different_version).await.unwrap();
-        assert_eq!(result["result"]["protocolVersion"], "2024-12-01");
+        assert_eq!(result["result"]["protocolVersion"], "2025-03-26");
     }
 
     /// Test client info handling
@@ -137,7 +137,7 @@ mod tests {
 
         let result = handler.handle_message(init_with_client_info).await.unwrap();
         assert!(result["result"]["serverInfo"].is_object());
-        
+
         let server_info = &result["result"]["serverInfo"];
         assert!(server_info["name"].is_string());
         assert!(server_info["version"].is_string());
@@ -165,7 +165,7 @@ mod tests {
 
         let result = handler.handle_message(init).await.unwrap();
         let capabilities = &result["result"]["capabilities"];
-        
+
         // Should include tools capability
         assert!(capabilities.get("tools").is_some());
 
@@ -203,7 +203,7 @@ mod tests {
         });
 
         let result = handler.handle_message(init).await.unwrap();
-        
+
         // Built-in handler may not support resources, but should respond gracefully
         let resources_request = json!({
             "jsonrpc": "2.0",
@@ -214,7 +214,9 @@ mod tests {
 
         let resources_result = handler.handle_message(resources_request).await.unwrap();
         // Should either succeed with empty list or fail gracefully
-        assert!(resources_result.get("result").is_some() || resources_result.get("error").is_some());
+        assert!(
+            resources_result.get("result").is_some() || resources_result.get("error").is_some()
+        );
     }
 
     /// Test prompts capability negotiation
@@ -237,7 +239,7 @@ mod tests {
         });
 
         let result = handler.handle_message(init).await.unwrap();
-        
+
         // Test prompts/list
         let prompts_request = json!({
             "jsonrpc": "2.0",
@@ -269,7 +271,7 @@ mod tests {
         });
 
         let result = handler.handle_message(init).await.unwrap();
-        
+
         // Test logging notification
         let log_notification = json!({
             "jsonrpc": "2.0",
@@ -303,7 +305,7 @@ mod tests {
         });
 
         let result = handler.handle_message(init).await.unwrap();
-        
+
         // Test sampling request (may not be supported by built-in handler)
         let sampling_request = json!({
             "jsonrpc": "2.0",
@@ -345,7 +347,7 @@ mod tests {
 
         let result = handler.handle_message(init).await.unwrap();
         assert!(result["result"]["capabilities"].is_object());
-        
+
         // Should still be able to use basic functionality
         let tools_request = json!({
             "jsonrpc": "2.0",
@@ -375,7 +377,7 @@ mod tests {
 
         let result = handler.handle_message(init).await.unwrap();
         assert!(result["result"]["capabilities"].is_object());
-        
+
         // Should work with default capabilities
         let tools_request = json!({
             "jsonrpc": "2.0",
@@ -409,10 +411,7 @@ mod tests {
         handler.handle_message(init).await.unwrap();
 
         // Methods that should work with basic tools capability
-        let valid_methods = vec![
-            "tools/list",
-            "tools/call",
-        ];
+        let valid_methods = vec!["tools/list", "tools/call"];
 
         for method in valid_methods {
             let request = json!({
@@ -426,7 +425,10 @@ mod tests {
             // Should not return "method not found" error
             if let Some(error) = result.get("error") {
                 let code = error["code"].as_i64().unwrap_or(0);
-                assert_ne!(code, -32601, "Method {method} should be available with tools capability");
+                assert_ne!(
+                    code, -32601,
+                    "Method {method} should be available with tools capability"
+                );
             }
         }
     }
@@ -453,7 +455,7 @@ mod tests {
 
         let result = handler.handle_message(init).await.unwrap();
         let server_caps = &result["result"]["capabilities"];
-        
+
         // Check what server actually supports
         let supports_tools = server_caps.get("tools").is_some();
         let supports_resources = server_caps.get("resources").is_some();
