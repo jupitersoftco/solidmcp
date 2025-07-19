@@ -10,7 +10,9 @@ use serde_json::{json, Value};
 /// Test that server info is correctly reported
 #[tokio::test]
 async fn test_server_info_correctness() -> Result<()> {
-    let server = mcp_test_helpers::McpTestServer::start().await?;
+    let server = mcp_test_helpers::McpTestServer::start()
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
     let url = format!("{}/mcp", server.http_url());
 
     let client = reqwest::Client::new();
@@ -44,14 +46,16 @@ async fn test_server_info_correctness() -> Result<()> {
         .unwrap();
     assert!(!server_name.is_empty(), "Server name should not be empty");
 
-    println!("✅ Server info correctly reported: {}", server_name);
+    println!("✅ Server info correctly reported: {server_name}");
     Ok(())
 }
 
 /// Test protocol version negotiation
 #[tokio::test]
 async fn test_protocol_version_negotiation() -> Result<()> {
-    let server = mcp_test_helpers::McpTestServer::start().await?;
+    let server = mcp_test_helpers::McpTestServer::start()
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
     let url = format!("{}/mcp", server.http_url());
 
     let client = reqwest::Client::new();
@@ -84,7 +88,9 @@ async fn test_protocol_version_negotiation() -> Result<()> {
 /// Test that server handles re-initialization correctly
 #[tokio::test]
 async fn test_reinitialization_handling() -> Result<()> {
-    let server = mcp_test_helpers::McpTestServer::start().await?;
+    let server = mcp_test_helpers::McpTestServer::start()
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
     let url = format!("{}/mcp", server.http_url());
 
     let client = reqwest::Client::new();

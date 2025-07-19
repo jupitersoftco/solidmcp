@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        core::McpServer as CoreServer,
+        core::McpServer,
         handler::{
             McpContext, McpHandler, McpNotification, PromptContent, PromptInfo, ResourceContent,
             ResourceInfo, ToolDefinition,
@@ -164,7 +164,7 @@ impl HighLevelMcpServer {
     /// Start the server on the specified port
     pub async fn start(self, port: u16) -> Result<()> {
         // Create core server with our custom handler
-        let mut core_server = CoreServer::with_handler(self.custom_handler).await?;
+        let mut core_server = McpServer::with_handler(self.custom_handler).await?;
 
         info!("🚀 Starting MCP server with custom tools on port {}", port);
         core_server.start(port).await
@@ -390,7 +390,7 @@ impl McpHandler for CustomMcpHandler {
             "protocolVersion": "2025-06-18",
             "capabilities": self.get_capabilities(),
             "serverInfo": {
-                "name": "solidmcp-server",
+                "name": "toy-notes-server",
                 "version": "0.1.0"
             }
         }))

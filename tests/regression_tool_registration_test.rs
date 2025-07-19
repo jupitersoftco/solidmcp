@@ -7,7 +7,7 @@ mod mcp_test_helpers;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use solidmcp::{ExtendedToolDefinition, McpServerBuilder, McpTool, ToolDefinition};
+use solidmcp::{ExtendedToolDefinition, McpServerBuilder, McpTool};
 
 /// A dummy tool for testing
 #[derive(Clone)]
@@ -23,18 +23,16 @@ impl McpTool for DummyTool {
 
     fn definition(&self) -> ExtendedToolDefinition {
         ExtendedToolDefinition {
-            definition: ToolDefinition {
-                name: self.name.clone(),
-                description: "Test tool".to_string(),
-                input_schema: json!({
-                    "type": "object",
-                    "properties": {}
-                }),
-            },
-            output_schema: Some(json!({
+            name: self.name.clone(),
+            description: "Test tool".to_string(),
+            input_schema: json!({
                 "type": "object",
                 "properties": {}
-            })),
+            }),
+            output_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
         }
     }
 

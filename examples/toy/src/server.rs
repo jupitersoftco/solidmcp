@@ -5,8 +5,8 @@ use {
     async_trait::async_trait,
     serde_json::{json, Value},
     solidmcp::{
-        ExtendedToolDefinition, HighLevelMcpServer, LogLevel, McpNotification, McpServerBuilder,
-        McpTool, ToolContext,
+        ExtendedToolDefinition, HighLevelMcpServer, LogLevel, McpNotification, McpResourceProvider,
+        McpServerBuilder, McpTool, ResourceContent, ResourceInfo, ToolContext,
     },
     std::{collections::HashMap, fs, path::PathBuf, sync::Arc},
     tokio::sync::RwLock,
@@ -248,6 +248,54 @@ impl McpTool for AddNotificationTool {
     }
 }
 
+/// Resource provider for notes
+#[derive(Clone)]
+pub struct NotesResourceProvider {
+    storage: NotesStorage,
+}
+
+impl NotesResourceProvider {
+    pub fn new(storage: NotesStorage) -> Self {
+        Self { storage }
+    }
+}
+
+#[async_trait]
+impl McpResourceProvider for NotesResourceProvider {
+    async fn list_resources(&self) -> Result<Vec<ResourceInfo>> {
+        let notes = self.storage.notes.read().await;
+        let mut resources = Vec::new();
+
+        for (name, _content) in notes.iter() {
+            resources.push(ResourceInfo {
+                uri: format!("notes://{}", name),
+                name: name.clone(),
+                description: Some(format!("Note: {}", name)),
+                mime_type: Some("text/markdown".to_string()),
+            });
+        }
+
+        Ok(resources)
+    }
+
+    async fn read_resource(&self, uri: &str) -> Result<ResourceContent> {
+        if let Some(name) = uri.strip_prefix("notes://") {
+            let notes = self.storage.notes.read().await;
+            if let Some(content) = notes.get(name) {
+                Ok(ResourceContent {
+                    uri: uri.to_string(),
+                    mime_type: Some("text/markdown".to_string()),
+                    content: content.clone(),
+                })
+            } else {
+                Err(anyhow::anyhow!("Note not found: {}", name))
+            }
+        } else {
+            Err(anyhow::anyhow!("Invalid note URI: {}", uri))
+        }
+    }
+}
+
 /// Create and configure the toy notes server
 pub async fn create_toy_server(notes_dir: PathBuf) -> Result<HighLevelMcpServer> {
     // Create storage
@@ -259,11 +307,15 @@ pub async fn create_toy_server(notes_dir: PathBuf) -> Result<HighLevelMcpServer>
     let list_notes_tool = ListNotesTool::new(storage.clone());
     let add_notification_tool = AddNotificationTool {};
 
-    // Build server with all tools
+    // Create resource provider
+    let resource_provider = NotesResourceProvider::new(storage);
+
+    // Build server with all tools and resources
     let mut builder = McpServerBuilder::new();
     builder = builder.add_tool(add_note_tool);
     builder = builder.add_tool(list_notes_tool);
     builder = builder.add_tool(add_notification_tool);
+    builder = builder.with_resources(resource_provider);
 
     let server = builder.build().await?;
 
