@@ -6,42 +6,12 @@ use {
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
     serde_json::{json, Value},
-    solidmcp::{framework::McpServerBuilder, LogLevel},
-    std::{collections::HashMap, fs, path::PathBuf, sync::Arc, time::Duration},
+    std::{fs, path::PathBuf, sync::Arc, time::Duration},
     tempfile::TempDir,
-    tokio::{sync::RwLock, time::timeout},
+    tokio::time::timeout,
     tokio_tungstenite::{connect_async, tungstenite::Message},
+    toy_notes_server::{NotesContext, NotesResourceProvider},
 };
-
-/// Test context for notes server
-#[derive(Debug)]
-struct TestNotesContext {
-    notes_dir: PathBuf,
-    notes: RwLock<HashMap<String, String>>,
-}
-
-impl TestNotesContext {
-    fn new(notes_dir: PathBuf) -> Self {
-        Self {
-            notes_dir,
-            notes: RwLock::new(HashMap::new()),
-        }
-    }
-
-    async fn save_note(&self, name: &str, content: &str) -> Result<()> {
-        let file_path = self.notes_dir.join(format!("{}.md", name));
-        fs::write(&file_path, content)?;
-        self.notes
-            .write()
-            .await
-            .insert(name.to_string(), content.to_string());
-        Ok(())
-    }
-
-    async fn list_notes(&self) -> Vec<String> {
-        self.notes.read().await.keys().cloned().collect()
-    }
-}
 
 // Schema definitions
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -76,20 +46,23 @@ struct NotificationResult {
     success: bool,
 }
 
-/// Create a test server using the new framework
+/// Create a test server using the new framework with real NotesContext
 async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
+    use solidmcp::framework::McpServerBuilder;
+
     // Ensure directory exists
     if !notes_dir.exists() {
         fs::create_dir_all(&notes_dir)?;
     }
 
-    let context = TestNotesContext::new(notes_dir);
+    let context = NotesContext::new(notes_dir);
+    context.load_notes().await?;
 
     McpServerBuilder::new(context, "toy-notes-server", "0.1.0")
         .with_tool(
             "add_note",
             "Add a new note",
-            |input: AddNote, ctx: Arc<TestNotesContext>, notify| async move {
+            |input: AddNote, ctx: Arc<NotesContext>, notify| async move {
                 ctx.save_note(&input.name, &input.content).await?;
 
                 // Clean notification API
@@ -104,7 +77,7 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
         .with_tool(
             "list_notes",
             "List all notes",
-            |_input: ListNotes, ctx: Arc<TestNotesContext>, _notify| async move {
+            |_input: ListNotes, ctx: Arc<NotesContext>, _notify| async move {
                 let notes = ctx.list_notes().await;
                 Ok(ListNotesResult { notes })
             },
@@ -112,7 +85,7 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
         .with_tool(
             "send_notification",
             "Send a notification",
-            |input: SendNotification, _ctx: Arc<TestNotesContext>, notify| async move {
+            |input: SendNotification, _ctx: Arc<NotesContext>, notify| async move {
                 // Clean notification API
                 match input.level.as_str() {
                     "debug" => notify.debug(&input.message)?,
@@ -125,6 +98,7 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
                 Ok(NotificationResult { success: true })
             },
         )
+        .with_resource_provider(Box::new(NotesResourceProvider))
         .build()
         .await
 }
@@ -313,6 +287,181 @@ async fn test_note_persistence() -> Result<()> {
 
     let content = fs::read_to_string(&note_file)?;
     assert_eq!(content, "This note should persist to disk");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_list_resources() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Add a test note first
+    let add_note_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "add_note",
+            "arguments": {
+                "name": "resource_test",
+                "content": "This note will be exposed as a resource"
+            }
+        }
+    });
+
+    write
+        .send(Message::Text(add_note_request.to_string()))
+        .await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // List resources
+    let list_resources_request = json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "resources/list"
+    });
+
+    write
+        .send(Message::Text(list_resources_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    let resources = parsed["result"]["resources"].as_array().unwrap();
+    assert_eq!(resources.len(), 1);
+
+    let resource = &resources[0];
+    assert_eq!(resource["uri"], "note://resource_test");
+    assert_eq!(resource["name"], "resource_test");
+    assert_eq!(resource["mimeType"], "text/markdown");
+    assert!(resource["description"]
+        .as_str()
+        .unwrap()
+        .contains("Markdown note"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_read_resource() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Add a test note
+    let note_content = "# Resource Test\n\nThis note is accessible as an MCP resource.";
+    let add_note_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "add_note",
+            "arguments": {
+                "name": "markdown_note",
+                "content": note_content
+            }
+        }
+    });
+
+    write
+        .send(Message::Text(add_note_request.to_string()))
+        .await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Read the resource
+    let read_resource_request = json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "resources/read",
+        "params": {
+            "uri": "note://markdown_note"
+        }
+    });
+
+    write
+        .send(Message::Text(read_resource_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    let result = &parsed["result"];
+    let contents = result["contents"].as_array().unwrap();
+    assert_eq!(contents.len(), 1);
+
+    let content = &contents[0];
+    assert_eq!(content["uri"], "note://markdown_note");
+    assert_eq!(content["mimeType"], "text/markdown");
+    assert_eq!(content["text"], note_content);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_resource_not_found() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Try to read a non-existent resource
+    let read_resource_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "resources/read",
+        "params": {
+            "uri": "note://nonexistent"
+        }
+    });
+
+    write
+        .send(Message::Text(read_resource_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    // Should get an error response
+    assert!(parsed["error"].is_object());
+    assert!(parsed["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Resource not found"));
 
     Ok(())
 }
