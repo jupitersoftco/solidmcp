@@ -4,7 +4,6 @@
 //! even though clients may not display them
 
 use anyhow::Result;
-use anyhow::Result;
 use serde_json::json;
 use solidmcp::McpTool;
 use solidmcp::{LogLevel, McpNotification, ToolContext};
