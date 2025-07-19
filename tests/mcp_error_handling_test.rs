@@ -3,10 +3,11 @@
 //! Tests error handling, edge cases, and failure scenarios.
 
 mod mcp_test_helpers;
-use mcp_test_helpers::{
-    with_mcp_test_server, initialize_mcp_connection_with_server, receive_ws_message, init_test_tracing
-};
 use futures_util::{SinkExt, StreamExt};
+use mcp_test_helpers::{
+    init_test_tracing, initialize_mcp_connection_with_server, receive_ws_message,
+    with_mcp_test_server,
+};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::time::timeout;
@@ -65,13 +66,15 @@ async fn test_mcp_error_codes() {
                 }
             } else {
                 error!("❌ Expected error for {}, got success", description);
-                return Err(format!("Expected error for {}", description).into());
+                return Err(format!("Expected error for {description}").into());
             }
         }
 
         info!("✅ Error code tests completed");
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 /// Test connection stress scenarios
@@ -132,7 +135,9 @@ async fn test_mcp_connection_stress() {
 
         info!("✅ Connection stress tests completed");
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 /// Test large message handling
@@ -215,7 +220,9 @@ async fn test_mcp_large_messages() {
         }
 
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 /// Test concurrent message handling
@@ -267,13 +274,15 @@ async fn test_mcp_concurrent_messages() {
 
             if response.get("error").is_some() {
                 error!("❌ Concurrent message {} failed: {}", i, response["error"]);
-                return Err(format!("Concurrent message {} failed", i).into());
+                return Err(format!("Concurrent message {i} failed").into());
             }
         }
 
         info!("✅ Concurrent message handling successful");
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 /// Test connection interruption handling
@@ -333,17 +342,22 @@ async fn test_mcp_connection_interruption() {
 
         info!("✅ Connection interruption tests completed");
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     // Test invalid server URLs
     let invalid_urls = vec![
-        "ws://localhost:99999/mcp",  // Non-existent port
-        "ws://invalid-host/mcp",     // Invalid host
+        "ws://localhost:99999/mcp", // Non-existent port
+        "ws://invalid-host/mcp",    // Invalid host
     ];
 
     for url in invalid_urls {
         let result = tokio_tungstenite::connect_async(url).await;
-        assert!(result.is_err(), "Should fail to connect to invalid URL: {}", url);
+        assert!(
+            result.is_err(),
+            "Should fail to connect to invalid URL: {url}"
+        );
         debug!("✅ Correctly failed to connect to invalid URL: {}", url);
     }
 }

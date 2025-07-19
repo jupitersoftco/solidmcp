@@ -4,22 +4,21 @@
 
 #[cfg(test)]
 use {
-    crate::protocol_testable::McpProtocolHandler,
-    crate::protocol_impl::McpProtocolHandlerImpl,
+    crate::protocol_impl::McpProtocolHandlerImpl, crate::protocol_testable::McpProtocolHandler,
     serde_json::json,
 };
 
 #[tokio::test]
 async fn test_mcp_tools_list() {
     let mut handler = McpProtocolHandlerImpl::new();
-    
+
     // Initialize first
     let init_message = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "initialize",
         "params": {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-06-18",
             "capabilities": {},
             "clientInfo": {
                 "name": "Cursor",
@@ -38,19 +37,17 @@ async fn test_mcp_tools_list() {
     });
 
     let response = handler.handle_message(tools_message).await.unwrap();
-    
+
     assert_eq!(response["jsonrpc"], "2.0");
     assert_eq!(response["id"], 2);
     assert!(response["result"].is_object());
     assert!(response["result"]["tools"].is_array());
-    
+
     let tools = response["result"]["tools"].as_array().unwrap();
     assert!(tools.len() >= 2); // Should have echo and read_file
-    
-    let tool_names: Vec<&str> = tools.iter()
-        .map(|t| t["name"].as_str().unwrap())
-        .collect();
-    
+
+    let tool_names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+
     assert!(tool_names.contains(&"echo"));
     assert!(tool_names.contains(&"read_file"));
 }
@@ -58,14 +55,14 @@ async fn test_mcp_tools_list() {
 #[tokio::test]
 async fn test_mcp_tool_call() {
     let mut handler = McpProtocolHandlerImpl::new();
-    
+
     // Initialize first
     let init_message = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "initialize",
         "params": {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-06-18",
             "capabilities": {},
             "clientInfo": {
                 "name": "Cursor",
@@ -89,12 +86,12 @@ async fn test_mcp_tool_call() {
     });
 
     let response = handler.handle_message(echo_message).await.unwrap();
-    
+
     assert_eq!(response["jsonrpc"], "2.0");
     assert_eq!(response["id"], 3);
     assert!(response["result"].is_object());
     assert!(response["result"]["content"].is_array());
-    
+
     let content = response["result"]["content"][0]["text"].as_str().unwrap();
     let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
     assert_eq!(parsed["echo"], "Hello from test!");
@@ -103,7 +100,7 @@ async fn test_mcp_tool_call() {
 #[tokio::test]
 async fn test_mcp_tool_call_without_initialization() {
     let mut handler = McpProtocolHandlerImpl::new();
-    
+
     let tool_message = json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -117,21 +114,28 @@ async fn test_mcp_tool_call_without_initialization() {
     });
 
     let result = handler.handle_message(tool_message).await;
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("not initialized"));
+    assert!(result.is_ok());
+    let response = result.unwrap();
+    assert_eq!(response["jsonrpc"], "2.0");
+    assert_eq!(response["id"], 1);
+    assert!(response["error"].is_object());
+    assert!(response["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Not initialized"));
 }
 
 #[tokio::test]
 async fn test_mcp_unknown_tool() {
     let mut handler = McpProtocolHandlerImpl::new();
-    
+
     // Initialize first
     let init_message = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "initialize",
         "params": {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-06-18",
             "capabilities": {},
             "clientInfo": {
                 "name": "Cursor",
@@ -153,6 +157,12 @@ async fn test_mcp_unknown_tool() {
     });
 
     let result = handler.handle_message(unknown_tool_message).await;
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Unknown tool"));
+    assert!(result.is_ok());
+    let response = result.unwrap();
+    assert_eq!(response["jsonrpc"], "2.0");
+    assert_eq!(response["id"], 4);
+    assert!(response["error"].is_object());
+    let error_message = response["error"]["message"].as_str().unwrap();
+    // Unknown tool errors are mapped to "Method not found" per JSON-RPC standards
+    assert!(error_message.contains("Method not found"));
 }

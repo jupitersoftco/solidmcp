@@ -269,7 +269,7 @@ fn generate_session_id() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    format!("session_{}", timestamp)
+    format!("session_{timestamp}")
 }
 
 /// Create an error reply with proper headers

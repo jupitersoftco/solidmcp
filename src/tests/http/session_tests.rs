@@ -9,7 +9,7 @@ mod tests {
         let session_id = generate_session_id();
         assert_eq!(session_id.len(), 32);
         assert!(session_id.chars().all(|c| c.is_alphanumeric()));
-        
+
         // Test uniqueness
         let session_id2 = generate_session_id();
         assert_ne!(session_id, session_id2);
@@ -21,17 +21,17 @@ mod tests {
         let cookie = Some("mcp_session=abc123def456; other=value".to_string());
         let session_id = extract_session_id_from_cookie(&cookie);
         assert_eq!(session_id, Some("abc123def456".to_string()));
-        
+
         // Test with session cookie only
         let cookie = Some("mcp_session=xyz789".to_string());
         let session_id = extract_session_id_from_cookie(&cookie);
         assert_eq!(session_id, Some("xyz789".to_string()));
-        
+
         // Test with no session cookie
         let cookie = Some("other=value; another=test".to_string());
         let session_id = extract_session_id_from_cookie(&cookie);
         assert_eq!(session_id, None);
-        
+
         // Test with None cookie
         let session_id = extract_session_id_from_cookie(&None);
         assert_eq!(session_id, None);

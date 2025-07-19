@@ -3,14 +3,9 @@
 //! Shared MCP protocol logic that can be used by both WebSocket and HTTP transports.
 
 use {
-    super::protocol_impl::McpProtocolHandlerImpl,
-    super::protocol_testable::McpProtocolHandler,
-    anyhow::Result,
-    serde_json::Value,
-    std::collections::HashMap,
-    std::sync::Arc,
-    tokio::sync::Mutex,
-    tracing::debug,
+    super::protocol_impl::McpProtocolHandlerImpl, super::protocol_testable::McpProtocolHandler,
+    anyhow::Result, serde_json::Value, std::collections::HashMap, std::sync::Arc,
+    tokio::sync::Mutex, tracing::debug,
 };
 
 pub struct SharedMcpHandler {

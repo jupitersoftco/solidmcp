@@ -54,7 +54,7 @@ async fn handle_mcp_ws(
                     debug!("{}", logger.fmt_message_received("text", text.len()));
                     debug!("📥 Raw MCP JSON: {}", text);
 
-                    match serde_json::from_str::<Value>(&text) {
+                    match serde_json::from_str::<Value>(text) {
                         Ok(message) => {
                             match shared_handler
                                 .handle_message(message.clone(), Some(session_id.clone()))
@@ -108,7 +108,7 @@ async fn handle_mcp_ws(
                             }
                         }
                         Err(e) => {
-                            error!("{}", logger.fmt_parse_error(&e.to_string(), &text));
+                            error!("{}", logger.fmt_parse_error(&e.to_string(), text));
 
                             let error_response = json!({
                                 "jsonrpc": "2.0",

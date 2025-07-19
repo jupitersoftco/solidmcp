@@ -171,8 +171,7 @@ impl McpProtocolHandlerImpl {
                     client_version, supported_versions
                 );
                 return Err(McpError::Internal(format!(
-                    "Unsupported protocol version: {}. Supported versions: {:?}",
-                    client_version, supported_versions
+                    "Unsupported protocol version: {client_version}. Supported versions: {supported_versions:?}"
                 ))
                 .into());
             }
@@ -260,9 +259,19 @@ impl McpProtocolHandlerImpl {
             tool_name, arguments
         );
 
-        let result = McpTools::execute_tool(tool_name, arguments).await?;
-        info!("🛠️  Tool '{}' executed successfully", tool_name);
-        Ok(result)
+        match McpTools::execute_tool(tool_name, arguments).await {
+            Ok(result) => {
+                info!("🛠️  Tool '{}' executed successfully", tool_name);
+                Ok(result)
+            }
+            Err(e) => {
+                if e.to_string().contains("Unknown tool") {
+                    Err(McpError::UnknownTool(tool_name.to_string()).into())
+                } else {
+                    Err(e)
+                }
+            }
+        }
     }
 
     /// Handle cancel notifications
@@ -275,6 +284,21 @@ impl McpProtocolHandlerImpl {
     async fn handle_initialized_notification(&mut self) -> Result<Value> {
         info!("✅ MCP client sent initialized notification");
         Ok(json!({}))
+    }
+
+    fn is_initialized(&self) -> bool {
+        self.initialized
+    }
+
+    fn protocol_version(&self) -> &str {
+        // Return the negotiated protocol version or default to the server's version
+        self.protocol_version
+            .as_deref()
+            .unwrap_or(self.protocol.version())
+    }
+
+    fn create_error_response(&self, id: Value, code: i32, message: &str) -> Value {
+        self.protocol.create_error_response(id, code, message)
     }
 }
 

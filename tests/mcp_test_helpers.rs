@@ -34,10 +34,10 @@ impl McpTestServer {
         let server_handle = tokio::spawn(async move {
             // Create the MCP server
             let mut server = solidmcp::McpServer::new().await.unwrap();
-            
+
             // Start the server with both HTTP and WebSocket support
             if let Err(e) = server.start(port).await {
-                eprintln!("Test server error: {}", e);
+                eprintln!("Test server error: {e}");
             }
         });
 
@@ -80,7 +80,7 @@ pub async fn receive_ws_message(
         .await
         .map_err(|_| "Timeout waiting for WebSocket message")?
         .ok_or("WebSocket stream ended unexpectedly")?
-        .map_err(|e| format!("WebSocket error: {}", e))?;
+        .map_err(|e| format!("WebSocket error: {e}"))?;
 
     match message {
         Message::Text(text) => Ok(text),
@@ -196,7 +196,7 @@ mod tests {
     #[tokio::test]
     async fn test_mcp_test_server_lifecycle() {
         init_test_tracing();
-        
+
         let server = McpTestServer::start().await.unwrap();
 
         // Verify server is running
@@ -215,7 +215,7 @@ mod tests {
     #[tokio::test]
     async fn test_with_mcp_test_server() {
         init_test_tracing();
-        
+
         let result = with_mcp_test_server("test_lifecycle", |server| async move {
             assert!(server.port > 0);
             Ok("test_passed")
@@ -229,7 +229,7 @@ mod tests {
     #[tokio::test]
     async fn test_with_mcp_connection() {
         init_test_tracing();
-        
+
         let result = with_mcp_connection(
             "test_connection",
             |_server, mut write, mut read| async move {

@@ -3,10 +3,8 @@
 //! Tests both WebSocket and HTTP MCP endpoints to ensure they work together.
 
 mod mcp_test_helpers;
-use mcp_test_helpers::{
-    with_mcp_test_server, initialize_mcp_connection_with_server, receive_ws_message, init_test_tracing
-};
 use futures_util::{SinkExt, StreamExt};
+use mcp_test_helpers::{init_test_tracing, receive_ws_message, with_mcp_test_server};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
@@ -38,7 +36,7 @@ async fn test_mcp_http_integration() -> Result<(), Box<dyn std::error::Error + S
 
         debug!("📤 Sending HTTP initialize request to {}", base_url);
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&init_message)
             .send()
             .await?;
@@ -50,8 +48,8 @@ async fn test_mcp_http_integration() -> Result<(), Box<dyn std::error::Error + S
         let status = response.status();
         if !status.is_success() {
             let error_text = response.text().await?;
-            println!("HTTP initialize error response: {}", error_text);
-            return Err(format!("HTTP request failed with status {}: {}", status, error_text).into());
+            println!("HTTP initialize error response: {error_text}");
+            return Err(format!("HTTP request failed with status {status}: {error_text}").into());
         }
 
         let response_json: Value = response.json().await?;
@@ -77,7 +75,7 @@ async fn test_mcp_http_integration() -> Result<(), Box<dyn std::error::Error + S
 
         debug!("📤 Sending HTTP tools/list request");
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&tools_message)
             .send()
             .await?;
@@ -118,7 +116,7 @@ async fn test_mcp_http_integration() -> Result<(), Box<dyn std::error::Error + S
 
         debug!("📤 Sending HTTP echo tool call");
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&echo_message)
             .send()
             .await?;
@@ -139,7 +137,8 @@ async fn test_mcp_http_integration() -> Result<(), Box<dyn std::error::Error + S
         info!("✅ HTTP tool call successful");
 
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -250,7 +249,8 @@ async fn test_mcp_websocket_still_works() -> Result<(), Box<dyn std::error::Erro
         info!("✅ WebSocket tool call successful");
 
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -286,7 +286,7 @@ async fn test_mcp_dual_transport() -> Result<(), Box<dyn std::error::Error + Sen
 
         debug!("📤 Sending HTTP initialize request");
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&init_message)
             .send()
             .await?;
@@ -339,7 +339,7 @@ async fn test_mcp_dual_transport() -> Result<(), Box<dyn std::error::Error + Sen
         });
 
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&echo_message)
             .send()
             .await?;
@@ -382,7 +382,8 @@ async fn test_mcp_dual_transport() -> Result<(), Box<dyn std::error::Error + Sen
         info!("✅ WebSocket tool call successful");
 
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -409,7 +410,7 @@ async fn test_mcp_http_error_handling() -> Result<(), Box<dyn std::error::Error 
 
         debug!("📤 Testing invalid JSON-RPC version");
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&invalid_version_message)
             .send()
             .await?;
@@ -430,7 +431,7 @@ async fn test_mcp_http_error_handling() -> Result<(), Box<dyn std::error::Error 
 
         debug!("📤 Testing missing method");
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&missing_method_message)
             .send()
             .await?;
@@ -451,7 +452,7 @@ async fn test_mcp_http_error_handling() -> Result<(), Box<dyn std::error::Error 
 
         debug!("📤 Testing unknown method");
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .json(&unknown_method_message)
             .send()
             .await?;
@@ -466,7 +467,7 @@ async fn test_mcp_http_error_handling() -> Result<(), Box<dyn std::error::Error 
         // Test 4: Invalid Content-Type
         debug!("📤 Testing invalid Content-Type");
         let response = client
-            .post(format!("{}/mcp", base_url))
+            .post(format!("{base_url}/mcp"))
             .header("Content-Type", "text/plain")
             .body("invalid json")
             .send()
@@ -478,7 +479,8 @@ async fn test_mcp_http_error_handling() -> Result<(), Box<dyn std::error::Error 
         info!("✅ Invalid Content-Type handled correctly");
 
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }

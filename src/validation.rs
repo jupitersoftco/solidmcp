@@ -99,9 +99,7 @@ impl McpValidator {
                         ]);
                     }
                     if let Some(params) = &mcp_message.params {
-                        if let Err(errors) = Self::validate_initialize_params(params) {
-                            return Err(errors);
-                        }
+                        Self::validate_initialize_params(params)?
                     }
                 }
                 "tools/call" => {
@@ -112,9 +110,7 @@ impl McpValidator {
                         ]);
                     }
                     if let Some(params) = &mcp_message.params {
-                        if let Err(errors) = Self::validate_tool_call_params(params) {
-                            return Err(errors);
-                        }
+                        Self::validate_tool_call_params(params)?
                     }
                 }
                 "tools/list" | "notifications/cancel" | "notifications/initialized" => {
@@ -222,7 +218,7 @@ impl McpValidator {
 
         // Try to extract basic info even if validation fails
         if let Some(jsonrpc) = message.get("jsonrpc").and_then(|v| v.as_str()) {
-            report.message_structure = Some(format!("jsonrpc: {}", jsonrpc));
+            report.message_structure = Some(format!("jsonrpc: {jsonrpc}"));
         }
 
         if let Some(method) = message.get("method").and_then(|v| v.as_str()) {
@@ -258,11 +254,11 @@ impl ValidationReport {
         let mut parts = Vec::new();
 
         if let Some(structure) = &self.message_structure {
-            parts.push(format!("Structure: {}", structure));
+            parts.push(format!("Structure: {structure}"));
         }
 
         if let Some(method) = &self.method_info {
-            parts.push(format!("Method: {}", method));
+            parts.push(format!("Method: {method}"));
         }
 
         if !self.errors.is_empty() {

@@ -5,13 +5,14 @@
 //! for connection, protocol, and tool execution problems.
 
 mod mcp_test_helpers;
-use mcp_test_helpers::{
-    with_mcp_test_server, initialize_mcp_connection_with_server, receive_ws_message, init_test_tracing
-};
 use futures_util::{SinkExt, StreamExt};
+use mcp_test_helpers::{
+    init_test_tracing, initialize_mcp_connection_with_server, receive_ws_message,
+    with_mcp_test_server,
+};
 use serde_json::{json, Value};
 use std::time::Duration;
-use tokio::time::timeout;
+// use tokio::time::timeout; // Commented out unused import
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
 
@@ -34,7 +35,7 @@ async fn test_mcp_comprehensive_debugging() {
     let server_check = check_server_availability().await;
     if let Err(e) = server_check {
         error!("❌ Server availability check failed: {}", e);
-        panic!("Server not available: {}", e);
+        panic!("Server not available: {e}");
     }
     info!("✅ Server availability confirmed");
 
@@ -42,7 +43,7 @@ async fn test_mcp_comprehensive_debugging() {
     let ws_test = test_websocket_connection().await;
     if let Err(e) = ws_test {
         error!("❌ WebSocket connection test failed: {}", e);
-        panic!("WebSocket connection failed: {}", e);
+        panic!("WebSocket connection failed: {e}");
     }
     info!("✅ WebSocket connection established");
 
@@ -50,7 +51,7 @@ async fn test_mcp_comprehensive_debugging() {
     let protocol_test = test_protocol_handshake().await;
     if let Err(e) = protocol_test {
         error!("❌ Protocol handshake test failed: {}", e);
-        panic!("Protocol handshake failed: {}", e);
+        panic!("Protocol handshake failed: {e}");
     }
     info!("✅ Protocol handshake successful");
 
@@ -58,7 +59,7 @@ async fn test_mcp_comprehensive_debugging() {
     let tools_test = test_tool_discovery().await;
     if let Err(e) = tools_test {
         error!("❌ Tool discovery test failed: {}", e);
-        panic!("Tool discovery failed: {}", e);
+        panic!("Tool discovery failed: {e}");
     }
     info!("✅ Tool discovery successful");
 
@@ -66,7 +67,7 @@ async fn test_mcp_comprehensive_debugging() {
     let execution_test = test_tool_execution().await;
     if let Err(e) = execution_test {
         error!("❌ Tool execution test failed: {}", e);
-        panic!("Tool execution failed: {}", e);
+        panic!("Tool execution failed: {e}");
     }
     info!("✅ Tool execution successful");
 
@@ -74,7 +75,7 @@ async fn test_mcp_comprehensive_debugging() {
     let error_test = test_error_handling().await;
     if let Err(e) = error_test {
         error!("❌ Error handling test failed: {}", e);
-        panic!("Error handling failed: {}", e);
+        panic!("Error handling failed: {e}");
     }
     info!("✅ Error handling validated");
 
@@ -95,10 +96,11 @@ async fn check_server_availability() -> Result<(), Box<dyn std::error::Error + S
     debug!("🔍 Checking server availability...");
 
     // Try to start a test server instance
-    let _server = with_mcp_test_server("availability_check", |server| async move {
+    with_mcp_test_server("availability_check", |server| async move {
         debug!("✅ Server is responding on port {}", server.port);
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     debug!("✅ Server availability confirmed");
     Ok(())
@@ -112,7 +114,8 @@ async fn test_websocket_connection() -> Result<(), Box<dyn std::error::Error + S
         let (_ws_stream, _) = tokio_tungstenite::connect_async(&server.ws_url()).await?;
         debug!("✅ WebSocket connection established");
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -144,7 +147,8 @@ async fn test_protocol_handshake() -> Result<(), Box<dyn std::error::Error + Sen
 
         debug!("✅ Protocol handshake successful");
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -198,7 +202,8 @@ async fn test_tool_discovery() -> Result<(), Box<dyn std::error::Error + Send + 
 
         debug!("✅ Tool discovery successful: found {:?}", tool_names);
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -291,7 +296,8 @@ async fn test_tool_execution() -> Result<(), Box<dyn std::error::Error + Send + 
 
         debug!("✅ Read file tool execution successful");
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -362,7 +368,8 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error + Send + 
 
         debug!("✅ Error handling for unknown tool successful");
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }
@@ -416,7 +423,8 @@ async fn test_performance() -> Result<(), Box<dyn std::error::Error + Send + Syn
         }
 
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     let elapsed = start_time.elapsed();
 

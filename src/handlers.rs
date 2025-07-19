@@ -21,10 +21,7 @@ pub struct McpHandlers {
 impl McpHandlers {
     pub fn new(logger: McpDebugLogger) -> Self {
         let protocol = McpProtocol::new();
-        Self {
-            logger,
-            protocol,
-        }
+        Self { logger, protocol }
     }
 
     /// Handle MCP protocol messages with comprehensive logging

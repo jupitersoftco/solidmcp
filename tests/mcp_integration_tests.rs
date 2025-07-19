@@ -6,8 +6,7 @@
 //! - Protocol initialization and tool calls
 
 mod mcp_test_helpers;
-use mcp_test_helpers::{with_mcp_test_server, init_test_tracing};
-use reqwest;
+use mcp_test_helpers::{init_test_tracing, with_mcp_test_server};
 use serde_json::json;
 use tokio::time::{sleep, Duration};
 use tracing::info;
@@ -32,7 +31,7 @@ async fn test_mcp_http_integration() {
             attempts += 1;
 
             let response = client
-                .get(&format!("http://localhost:{}/health", port))
+                .get(format!("http://localhost:{port}/health"))
                 .timeout(Duration::from_secs(2))
                 .send()
                 .await;
@@ -51,10 +50,7 @@ async fn test_mcp_http_integration() {
         }
 
         if !response_ok {
-            return Err(format!(
-                "Server not ready after {} attempts",
-                max_attempts
-            ).into());
+            return Err(format!("Server not ready after {max_attempts} attempts").into());
         }
 
         // Test MCP HTTP endpoint
@@ -78,7 +74,7 @@ async fn test_mcp_http_integration() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .header("Content-Type", "application/json")
             .json(&init_request)
             .send()
@@ -91,7 +87,10 @@ async fn test_mcp_http_integration() {
             .await
             .expect("Failed to parse initialize response");
 
-        info!("📄 Initialize response: {}", serde_json::to_string_pretty(&init_response).unwrap());
+        info!(
+            "📄 Initialize response: {}",
+            serde_json::to_string_pretty(&init_response).unwrap()
+        );
         assert_eq!(init_response["jsonrpc"], "2.0");
         assert_eq!(init_response["id"], 1);
         assert!(init_response["result"].is_object());
@@ -104,7 +103,7 @@ async fn test_mcp_http_integration() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .header("Content-Type", "application/json")
             .json(&list_tools_request)
             .send()
@@ -117,7 +116,10 @@ async fn test_mcp_http_integration() {
             .await
             .expect("Failed to parse list tools response");
 
-        info!("📄 List tools response: {}", serde_json::to_string_pretty(&list_response).unwrap());
+        info!(
+            "📄 List tools response: {}",
+            serde_json::to_string_pretty(&list_response).unwrap()
+        );
         assert_eq!(list_response["jsonrpc"], "2.0");
         assert_eq!(list_response["id"], 2);
         assert!(list_response["result"]["tools"].is_array());
@@ -136,7 +138,7 @@ async fn test_mcp_http_integration() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .header("Content-Type", "application/json")
             .json(&call_request)
             .send()
@@ -149,13 +151,18 @@ async fn test_mcp_http_integration() {
             .await
             .expect("Failed to parse call response");
 
-        info!("📄 Call response: {}", serde_json::to_string_pretty(&call_response).unwrap());
+        info!(
+            "📄 Call response: {}",
+            serde_json::to_string_pretty(&call_response).unwrap()
+        );
         assert_eq!(call_response["jsonrpc"], "2.0");
         assert_eq!(call_response["id"], 3);
         assert!(call_response["result"]["content"].is_array());
 
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -178,7 +185,7 @@ async fn test_mcp_protocol_compliance() {
             attempts += 1;
 
             let response = client
-                .get(&format!("http://localhost:{}/health", port))
+                .get(format!("http://localhost:{port}/health"))
                 .timeout(Duration::from_secs(2))
                 .send()
                 .await;
@@ -197,10 +204,7 @@ async fn test_mcp_protocol_compliance() {
         }
 
         if !response_ok {
-            return Err(format!(
-                "Server not ready after {} attempts",
-                max_attempts
-            ).into());
+            return Err(format!("Server not ready after {max_attempts} attempts").into());
         }
 
         // Test protocol compliance
@@ -209,7 +213,7 @@ async fn test_mcp_protocol_compliance() {
         // Test 1: Invalid JSON-RPC request
         let invalid_request = "invalid json";
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .header("Content-Type", "application/json")
             .body(invalid_request)
             .send()
@@ -226,7 +230,7 @@ async fn test_mcp_protocol_compliance() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .header("Content-Type", "application/json")
             .json(&missing_method_request)
             .send()
@@ -244,7 +248,7 @@ async fn test_mcp_protocol_compliance() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .header("Content-Type", "application/json")
             .json(&unsupported_request)
             .send()
@@ -255,7 +259,9 @@ async fn test_mcp_protocol_compliance() {
         assert!(!response.status().is_success());
 
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -283,7 +289,7 @@ async fn test_mcp_tool_execution() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .json(&init_request)
             .send()
             .await?;
@@ -304,14 +310,14 @@ async fn test_mcp_tool_execution() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .json(&echo_request)
             .send()
             .await?;
 
         assert!(response.status().is_success());
         let echo_response: serde_json::Value = response.json().await?;
-        
+
         assert_eq!(echo_response["jsonrpc"], "2.0");
         assert_eq!(echo_response["id"], 2);
         assert!(echo_response["result"]["content"].is_array());
@@ -330,14 +336,14 @@ async fn test_mcp_tool_execution() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .json(&read_request)
             .send()
             .await?;
 
         assert!(response.status().is_success());
         let read_response: serde_json::Value = response.json().await?;
-        
+
         assert_eq!(read_response["jsonrpc"], "2.0");
         assert_eq!(read_response["id"], 3);
         assert!(read_response["result"]["content"].is_array());
@@ -354,7 +360,7 @@ async fn test_mcp_tool_execution() {
         });
 
         let response = client
-            .post(&format!("http://localhost:{}/mcp", port))
+            .post(format!("http://localhost:{port}/mcp"))
             .json(&unknown_request)
             .send()
             .await?;
@@ -366,5 +372,7 @@ async fn test_mcp_tool_execution() {
         assert!(unknown_response.get("error").is_some());
 
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }

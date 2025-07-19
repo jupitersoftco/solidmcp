@@ -3,10 +3,10 @@
 //! Tests protocol handshake, message exchange, and JSON-RPC compliance.
 
 mod mcp_test_helpers;
-use mcp_test_helpers::{
-    receive_ws_message, with_mcp_connection, with_mcp_test_server, init_test_tracing
-};
 use futures_util::{SinkExt, StreamExt};
+use mcp_test_helpers::{
+    init_test_tracing, receive_ws_message, with_mcp_connection, with_mcp_test_server,
+};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
@@ -67,7 +67,9 @@ async fn test_mcp_protocol_initialize() {
         }
 
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 /// Test protocol version compatibility
@@ -119,7 +121,9 @@ async fn test_mcp_protocol_version() {
 
         info!("✅ Protocol version tests completed");
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 /// Test malformed protocol messages
@@ -182,7 +186,9 @@ async fn test_mcp_protocol_malformed() {
 
         info!("✅ Malformed message tests completed");
         Ok(())
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 /// Test protocol message ordering
@@ -226,8 +232,7 @@ async fn test_mcp_protocol_ordering() {
             // Collect responses
             let mut responses = Vec::new();
             for _ in 0..requests.len() {
-                let response_text =
-                    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+                let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
                 let response: Value = serde_json::from_str(&response_text)?;
                 responses.push(response);
             }
@@ -273,7 +278,7 @@ async fn test_jsonrpc_compliance() {
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             let response: Value = serde_json::from_str(&response_text)?;
-            
+
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], "test-string-id");
 
@@ -291,7 +296,7 @@ async fn test_jsonrpc_compliance() {
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             let response: Value = serde_json::from_str(&response_text)?;
-            
+
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], serde_json::Value::Null);
 
@@ -308,7 +313,7 @@ async fn test_jsonrpc_compliance() {
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             let response: Value = serde_json::from_str(&response_text)?;
-            
+
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], 42);
 

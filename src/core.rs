@@ -49,7 +49,7 @@ impl McpServer {
         // Combine routes - warp will handle content negotiation
         let routes = ws_route.or(http_route);
 
-        let addr = format!("127.0.0.1:{}", port)
+        let addr = format!("127.0.0.1:{port}")
             .parse::<std::net::SocketAddr>()
             .context("Invalid address")?;
 
@@ -58,10 +58,7 @@ impl McpServer {
             .await
             .map_err(|e| anyhow::anyhow!("Could not bind to {}: {}", addr, e))?;
 
-        println!(
-            "🌐 MCP Server listening on ws://{}/mcp and http://{}/mcp",
-            addr, addr
-        );
+        println!("🌐 MCP Server listening on ws://{addr}/mcp and http://{addr}/mcp");
         println!("📡 Available endpoints:");
         println!("  WS  /mcp (WebSocket upgrade)");
         println!("  POST /mcp (HTTP JSON-RPC)");

@@ -162,11 +162,11 @@ impl McpDebugLogger {
 }
 
 pub fn fmt_mcp_server_startup(port: u16) -> String {
-    format!("🚀 Starting MCP Server on port {}", port)
+    format!("🚀 Starting MCP Server on port {port}")
 }
 
 pub fn fmt_mcp_server_ready(addr: &str) -> String {
-    format!("✅ MCP Server ready and listening on {}", addr)
+    format!("✅ MCP Server ready and listening on {addr}")
 }
 
 pub fn fmt_mcp_server_shutdown() -> String {

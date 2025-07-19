@@ -9,7 +9,7 @@ use mcp_test_helpers::init_test_tracing;
 #[tokio::test]
 async fn test_mcp_server_basic_functionality() {
     init_test_tracing();
-    
+
     // Test server creation
     let _server = solidmcp::McpServer::new().await.unwrap();
     println!("✅ MCP server created successfully");
@@ -25,7 +25,7 @@ async fn test_mcp_server_basic_functionality() {
 
     assert!(tool_names.contains(&"echo"));
     assert!(tool_names.contains(&"read_file"));
-    println!("✅ Tools list validated: {:?}", tool_names);
+    println!("✅ Tools list validated: {tool_names:?}");
 
     // Test echo tool
     let echo_result = solidmcp::McpTools::execute_tool(
@@ -40,7 +40,7 @@ async fn test_mcp_server_basic_functionality() {
     let echo_result = echo_result.unwrap();
 
     let content = echo_result["content"][0]["text"].as_str().unwrap();
-    println!("DEBUG: Content from echo tool: '{}'", content);
+    println!("DEBUG: Content from echo tool: '{content}'");
     let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
     assert_eq!(parsed["echo"], "Hello from basic integration test!");
     println!("✅ Echo tool validated");
@@ -81,7 +81,8 @@ async fn test_mcp_server_basic_functionality() {
     println!("✅ Read file error handling validated");
 
     // Test unknown tool
-    let unknown_result = solidmcp::McpTools::execute_tool("unknown_tool", serde_json::json!({})).await;
+    let unknown_result =
+        solidmcp::McpTools::execute_tool("unknown_tool", serde_json::json!({})).await;
     assert!(unknown_result.is_err());
     println!("✅ Unknown tool error handling validated");
 
@@ -92,7 +93,7 @@ async fn test_mcp_server_basic_functionality() {
 #[tokio::test]
 async fn test_mcp_protocol_messages() {
     init_test_tracing();
-    
+
     let _server = solidmcp::McpServer::new().await.unwrap();
     let protocol = solidmcp::McpProtocol::new();
 
@@ -104,14 +105,16 @@ async fn test_mcp_protocol_messages() {
 
     // Test success response
     let test_result = serde_json::json!({"test": "data"});
-    let success_response = protocol.create_success_response(serde_json::json!(1), test_result.clone());
+    let success_response =
+        protocol.create_success_response(serde_json::json!(1), test_result.clone());
     assert_eq!(success_response["jsonrpc"], "2.0");
     assert_eq!(success_response["id"], 1);
     assert_eq!(success_response["result"], test_result);
     println!("✅ Success response validated");
 
     // Test error response
-    let error_response = protocol.create_error_response(serde_json::json!(2), -32603, "Internal error");
+    let error_response =
+        protocol.create_error_response(serde_json::json!(2), -32603, "Internal error");
     assert_eq!(error_response["jsonrpc"], "2.0");
     assert_eq!(error_response["id"], 2);
     assert_eq!(error_response["error"]["code"], -32603);
@@ -125,7 +128,7 @@ async fn test_mcp_protocol_messages() {
 #[tokio::test]
 async fn test_mcp_handlers() {
     init_test_tracing();
-    
+
     let _server = solidmcp::McpServer::new().await.unwrap();
     let connection_id = solidmcp::logging::McpConnectionId::new();
     let logger = solidmcp::logging::McpDebugLogger::new(connection_id);
