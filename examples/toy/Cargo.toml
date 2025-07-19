@@ -1,0 +1,33 @@
+[package]
+name = "toy-notes-server"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "toy_notes_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "toy-notes-server"
+path = "src/main.rs"
+
+[dependencies]
+solidmcp = { path = "../.." }
+anyhow = "1.0"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+notify = "6.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.36", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.7", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+reqwest = { version = "0.11", features = ["json"] }
+warp = "0.3"
+tokio-stream = { version = "0.1", features = ["net"] }
