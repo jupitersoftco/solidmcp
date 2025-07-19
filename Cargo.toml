@@ -12,7 +12,7 @@ homepage = "https://github.com/jupitersoftco/solidmcp"
 documentation = "https://docs.rs/solidmcp"
 keywords = ["mcp", "model-context-protocol", "ai", "llm", "server"]
 categories = ["network-programming", "web-programming", "api-bindings"]
-authors = ["SolidMCP Contributors"]
+authors = ["Jupiter Software LLC <matt@jupitersoft.net>"]
 readme = "README.md"
 
 [lib]
