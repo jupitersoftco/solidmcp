@@ -21,7 +21,7 @@ mod tests {
     async fn test_mcp_server_creation() {
         let connection_id = McpConnectionId::new();
         let logger = McpDebugLogger::new(connection_id);
-        let handlers = McpHandlers::new(logger);
+        let _handlers = McpHandlers::new(logger);
         // Basic handler creation test - just ensure it compiles
         assert!(true);
     }
@@ -36,7 +36,7 @@ mod tests {
             "file_path": path
         });
         
-        let result = McpTools::handle_tool_call("read_file", tool_params).await.unwrap();
+        let result = McpTools::execute_tool("read_file", tool_params).await.unwrap();
         let content = result["content"][0]["text"].as_str().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
         assert_eq!(parsed["content"], "hello-mcp");
@@ -69,7 +69,7 @@ mod tests {
             "message": "Hello, MCP!"
         });
         
-        let result = McpTools::handle_tool_call("echo", tool_params).await.unwrap();
+        let result = McpTools::execute_tool("echo", tool_params).await.unwrap();
         let content = result["content"][0]["text"].as_str().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
         assert_eq!(parsed["echo"], "Hello, MCP!");
@@ -81,7 +81,7 @@ mod tests {
             "file_path": "Cargo.toml"
         });
         
-        let result = McpTools::handle_tool_call("read_file", tool_params).await.unwrap();
+        let result = McpTools::execute_tool("read_file", tool_params).await.unwrap();
         let content = result["content"][0]["text"].as_str().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
         

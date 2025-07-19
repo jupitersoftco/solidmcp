@@ -11,7 +11,7 @@ async fn test_mcp_server_basic_functionality() {
     init_test_tracing();
     
     // Test server creation
-    let server = solidmcp::McpServer::new();
+    let _server = solidmcp::McpServer::new().await.unwrap();
     println!("✅ MCP server created successfully");
 
     // Test tools list
@@ -93,13 +93,13 @@ async fn test_mcp_server_basic_functionality() {
 async fn test_mcp_protocol_messages() {
     init_test_tracing();
     
-    let server = solidmcp::McpServer::new();
-    let protocol = server.protocol();
+    let _server = solidmcp::McpServer::new().await.unwrap();
+    let protocol = solidmcp::McpProtocol::new();
 
     // Test initialize response
     let init_response = protocol.create_initialize_response();
     assert!(init_response["protocolVersion"].as_str().is_some());
-    assert!(init_response["serverInfo"]["name"].as_str().unwrap() == "solidmcp");
+    assert!(init_response["serverInfo"]["name"].as_str().unwrap() == "mcp-server");
     println!("✅ Initialize response validated");
 
     // Test success response
@@ -126,8 +126,10 @@ async fn test_mcp_protocol_messages() {
 async fn test_mcp_handlers() {
     init_test_tracing();
     
-    let server = solidmcp::McpServer::new();
-    let handler = server.create_handler();
+    let _server = solidmcp::McpServer::new().await.unwrap();
+    let connection_id = solidmcp::logging::McpConnectionId::new();
+    let logger = solidmcp::logging::McpDebugLogger::new(connection_id);
+    let handler = solidmcp::handlers::McpHandlers::new(logger);
 
     // Test initialize handler
     let init_message = serde_json::json!({

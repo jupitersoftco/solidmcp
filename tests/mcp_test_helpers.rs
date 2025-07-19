@@ -33,7 +33,7 @@ impl McpTestServer {
         // Start the server on the dynamic port
         let server_handle = tokio::spawn(async move {
             // Create the MCP server
-            let server = solidmcp::McpServer::new();
+            let mut server = solidmcp::McpServer::new().await.unwrap();
             
             // Start the server with both HTTP and WebSocket support
             if let Err(e) = server.start(port).await {

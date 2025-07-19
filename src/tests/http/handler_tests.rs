@@ -13,7 +13,7 @@ mod tests {
     async fn test_http_endpoint_exists() {
         let connection_id = McpConnectionId::new();
         let logger = McpDebugLogger::new(connection_id);
-        let shared_handler = Arc::new(SharedMcpHandler::new(logger));
+        let shared_handler = Arc::new(SharedMcpHandler::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
         
@@ -43,7 +43,7 @@ mod tests {
     async fn test_invalid_json_returns_error() {
         let connection_id = McpConnectionId::new();
         let logger = McpDebugLogger::new(connection_id);
-        let shared_handler = Arc::new(SharedMcpHandler::new(logger));
+        let shared_handler = Arc::new(SharedMcpHandler::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
         
@@ -63,7 +63,7 @@ mod tests {
     async fn test_get_method_not_allowed() {
         let connection_id = McpConnectionId::new();
         let logger = McpDebugLogger::new(connection_id);
-        let shared_handler = Arc::new(SharedMcpHandler::new(logger));
+        let shared_handler = Arc::new(SharedMcpHandler::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
         

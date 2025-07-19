@@ -15,7 +15,7 @@ use tracing::{debug, error, info};
 
 /// Test basic MCP WebSocket connection with isolated server
 #[tokio::test]
-async fn test_mcp_connection_basic() -> anyhow::Result<()> {
+async fn test_mcp_connection_basic() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     info!("🔌 Testing basic MCP WebSocket connection with isolated server");
 

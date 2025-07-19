@@ -10,7 +10,6 @@ use {
     super::shared::SharedMcpHandler,
     anyhow::{Context, Result},
     std::sync::Arc,
-    tokio::sync::Mutex,
     tracing::info,
     warp::Filter,
 };
