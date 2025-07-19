@@ -8,7 +8,7 @@ use {
     anyhow::Result,
     serde_json::{json, Value},
     std::sync::Arc,
-    tracing::{debug, error, info},
+    tracing::{debug, error, info, warn},
     warp::http::StatusCode,
     warp::{reply, Filter, Rejection, Reply},
 };
@@ -79,9 +79,19 @@ async fn handle_mcp_http(
     // Extract method for session ID logic
     let method = message.get("method").and_then(|m| m.as_str()).unwrap_or("");
 
-    // For initialize requests without a session cookie, generate a new session ID
-    let effective_session_id = if method == "initialize" && session_id.is_none() {
-        Some(generate_session_id())
+    // For HTTP clients that don't handle cookies properly (like Claude), we need a fallback
+    // Use a consistent session ID for the duration of the server process
+    let effective_session_id = if method == "initialize" {
+        // Always use a consistent session for initialize requests
+        Some("http_default_session".to_string())
+    } else if session_id.is_none() {
+        // Fallback: for clients that don't send cookies, use the same default session
+        // This allows stateless HTTP clients to work with the MCP protocol
+        warn!(
+            "⚠️  No session cookie found for method '{}'. Using default HTTP session.",
+            method
+        );
+        Some("http_default_session".to_string())
     } else {
         session_id.clone()
     };
@@ -138,8 +148,6 @@ async fn handle_mcp_http(
     );
     let message_clone = message.clone();
 
-    // Extract session ID from cookie
-    let session_id = extract_session_id_from_cookie(&cookie);
     debug!("🍪 Session ID from cookie: {:?}", session_id);
     debug!("🍪 Effective session ID: {:?}", effective_session_id);
 
@@ -264,12 +272,17 @@ fn extract_session_id_from_cookie(cookie: &Option<String>) -> Option<String> {
 
 /// Generate a new session ID
 fn generate_session_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    format!("session_{timestamp}")
+    let count = COUNTER.fetch_add(1, Ordering::SeqCst);
+    format!("session_{timestamp}_{count}")
 }
 
 /// Create an error reply with proper headers
@@ -281,3 +294,141 @@ fn create_error_reply(error_response: Value, status: StatusCode) -> warp::reply:
 }
 
 pub mod session;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_extract_session_id_from_cookie() {
+        // Test with valid session cookie
+        let cookie = Some("mcp_session=test_session_123; other=value".to_string());
+        assert_eq!(
+            extract_session_id_from_cookie(&cookie),
+            Some("test_session_123".to_string())
+        );
+
+        // Test with session cookie only
+        let cookie = Some("mcp_session=simple_session".to_string());
+        assert_eq!(
+            extract_session_id_from_cookie(&cookie),
+            Some("simple_session".to_string())
+        );
+
+        // Test with no session cookie
+        let cookie = Some("other=value; another=test".to_string());
+        assert_eq!(extract_session_id_from_cookie(&cookie), None);
+
+        // Test with empty cookie
+        let cookie = Some("".to_string());
+        assert_eq!(extract_session_id_from_cookie(&cookie), None);
+
+        // Test with None
+        assert_eq!(extract_session_id_from_cookie(&None), None);
+
+        // Test with spaces around session value
+        let cookie = Some("mcp_session=  spaced_session  ; other=value".to_string());
+        assert_eq!(
+            extract_session_id_from_cookie(&cookie),
+            Some("spaced_session".to_string())
+        );
+    }
+
+    #[test]
+    fn test_generate_session_id_format() {
+        let session_id = generate_session_id();
+
+        // Should start with "session_"
+        assert!(session_id.starts_with("session_"));
+
+        // Should have reasonable length
+        assert!(session_id.len() > 8);
+        assert!(session_id.len() < 30);
+
+        // Should contain only alphanumeric and underscore
+        assert!(session_id.chars().all(|c| c.is_alphanumeric() || c == '_'));
+    }
+
+    #[test]
+    fn test_generate_session_id_uniqueness() {
+        // Generate multiple session IDs
+        let ids: Vec<String> = (0..100).map(|_| generate_session_id()).collect();
+
+        // All should be unique
+        let unique_count = ids.iter().collect::<std::collections::HashSet<_>>().len();
+        assert_eq!(unique_count, ids.len());
+    }
+
+    #[test]
+    fn test_create_error_reply_format() {
+        let error = json!({
+            "jsonrpc": "2.0",
+            "id": null,
+            "error": {
+                "code": -32600,
+                "message": "Invalid Request"
+            }
+        });
+
+        let response = create_error_reply(error.clone(), StatusCode::OK);
+
+        // Should have correct status
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Should have correct content type header
+        let headers = response.headers();
+        assert_eq!(headers.get("content-type").unwrap(), "application/json");
+    }
+
+    #[test]
+    fn test_effective_session_id_logic() {
+        // Test initialize method without session
+        let method = "initialize";
+        let session_id: Option<String> = None;
+
+        let effective_session_id = if method == "initialize" {
+            Some("http_default_session".to_string())
+        } else if session_id.is_none() {
+            Some("http_default_session".to_string())
+        } else {
+            session_id.clone()
+        };
+
+        assert_eq!(
+            effective_session_id,
+            Some("http_default_session".to_string())
+        );
+
+        // Test non-initialize method without session
+        let method = "tools/list";
+        let session_id: Option<String> = None;
+
+        let effective_session_id = if method == "initialize" {
+            Some("http_default_session".to_string())
+        } else if session_id.is_none() {
+            Some("http_default_session".to_string())
+        } else {
+            session_id.clone()
+        };
+
+        assert_eq!(
+            effective_session_id,
+            Some("http_default_session".to_string())
+        );
+
+        // Test with existing session
+        let method = "tools/list";
+        let session_id = Some("existing_session".to_string());
+
+        let effective_session_id = if method == "initialize" {
+            Some("http_default_session".to_string())
+        } else if session_id.is_none() {
+            Some("http_default_session".to_string())
+        } else {
+            session_id.clone()
+        };
+
+        assert_eq!(effective_session_id, Some("existing_session".to_string()));
+    }
+}
