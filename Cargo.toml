@@ -5,13 +5,14 @@ members = [".", "examples/toy"]
 name = "solidmcp"
 version = "0.1.0"
 edition = "2021"
-description = "A high-level Rust toolkit for building Model Context Protocol (MCP) servers with minimal boilerplate and maximum type safety"
+description = "A high-level Rust toolkit for building Model Context Protocol (MCP) servers with type safety and minimal boilerplate. Supports tools, resources, and prompts with automatic JSON schema generation."
 license = "MIT"
-repository = "https://github.com/yourusername/solidmcp"
+repository = "https://github.com/anon/solidmcp"
+homepage = "https://github.com/anon/solidmcp"
 documentation = "https://docs.rs/solidmcp"
-keywords = ["mcp", "model-context-protocol", "ai", "protocol", "server"]
+keywords = ["mcp", "model-context-protocol", "ai", "llm", "server"]
 categories = ["network-programming", "web-programming", "api-bindings"]
-authors = ["Your Name <your.email@example.com>"]
+authors = ["SolidMCP Contributors"]
 readme = "README.md"
 
 [lib]

@@ -2,6 +2,9 @@
 name = "toy-notes-server"
 version = "0.1.0"
 edition = "2021"
+description = "Example MCP server demonstrating SolidMCP framework capabilities with a note-taking application"
+license = "MIT"
+publish = false
 
 [lib]
 name = "toy_notes_server"

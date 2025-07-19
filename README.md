@@ -102,14 +102,30 @@ Then connect with Claude Desktop or any MCP client at `ws://localhost:3002/mcp` 
 
 ## MCP Protocol Support
 
-SolidMCP implements the complete MCP specification:
+SolidMCP implements core MCP functionality with room for expansion:
 
-- **Protocol Versions**: `2025-03-26` and `2025-06-18`
+### ✅ **Fully Supported**
+- **Protocol Versions**: `2025-03-26` and `2025-06-18` 
 - **Transport**: WebSocket and HTTP with session management
-- **Tools**: Execute functions with validated inputs and outputs  
-- **Resources**: Expose data with URI-based access
-- **Prompts**: Provide templates with argument substitution
-- **Notifications**: Send log messages and capability change notifications
+- **Tools**: Execute functions with validated inputs and outputs (`tools/list`, `tools/call`)
+- **Resources**: Expose data with URI-based access (`resources/list`, `resources/read`)
+- **Prompts**: Provide templates with argument substitution (`prompts/list`, `prompts/get`)
+- **Notifications**: Log messages and resource change notifications
+- **Initialization**: Full handshake and capability negotiation
+
+### 🚧 **Planned/Partial Support**
+- **Client Features**: Sampling, roots, and completion (server-side features not yet implemented)
+- **Progress Tracking**: Basic framework exists, needs expansion
+- **Cancellation**: Basic support for `notifications/cancel`
+- **Configuration**: Environment variable support, needs structured config API
+
+### ❌ **Not Yet Implemented**
+- **Sampling**: LLM sampling requests from servers to clients
+- **Roots**: Server-initiated boundary inquiries  
+- **Completion**: Advanced completion capabilities
+- **Advanced Security**: Comprehensive consent flows and access controls
+
+SolidMCP focuses on the **server-side** of MCP, providing everything needed to build robust MCP servers that work with existing MCP clients like Claude Desktop.
 
 ## Advanced Usage
 
@@ -197,6 +213,18 @@ SolidMCP is built with a modular architecture:
 - **Core Server** (`core.rs`) - Server lifecycle and connection management
 
 The library abstracts away the complexity of the MCP protocol while providing full access to all its features.
+
+## Current Limitations
+
+SolidMCP is a **server-focused** implementation. Some limitations to be aware of:
+
+1. **Client Features**: Does not implement client-side capabilities like sampling, roots, or completion
+2. **Progress API**: Basic progress tracking exists but needs expansion for complex operations  
+3. **Security Model**: Basic session management, but enterprise-grade security features are planned
+4. **Config Management**: Relies on environment variables; structured configuration API coming
+5. **Protocol Extensions**: Focuses on core MCP; custom protocol extensions not yet supported
+
+These limitations reflect our focus on providing an excellent **server development experience**. Client features and advanced capabilities are on the roadmap.
 
 ## Testing
 
