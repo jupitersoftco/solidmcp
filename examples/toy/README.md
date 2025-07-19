@@ -1,29 +1,30 @@
-# Toy Notes Server - MCP Protocol Demonstration
+# Toy Notes Server - Complete SolidMCP Example
 
-A comprehensive example MCP server that demonstrates all protocol features through a simple note-taking application.
-
-> **Note**: This example currently uses the built-in tools (echo and read_file) while the high-level API is being integrated. The full note-taking functionality with resources and prompts will be available once the integration is complete.
+A comprehensive example demonstrating all MCP features using the SolidMCP framework. This example shows how to build a real-world MCP server with minimal boilerplate while supporting the complete MCP specification.
 
 ## Features Demonstrated
 
-### 🛠️ Tools
-- **create_note** - Create a new note with title, content, and tags
-- **list_notes** - List all notes with optional tag filtering
-- **read_note** - Read a specific note by ID
-- **delete_note** - Delete a note by ID
+### 🛠️ Tools (Type-Safe with Auto Schema Generation)
+- **add_note** - Create a new note with automatic timestamp
+- **list_notes** - List all available notes with count
+- **read_note** - Read a specific note by name
+- **delete_note** - Delete a note with confirmation
+- **send_notification** - Send log messages at different levels
 
-### 📚 Resources
-- Notes are exposed as resources with URIs like `note://uuid`
-- Each note can be read as a markdown resource
-- Resources include metadata like creation date
+### 📚 Resources (URI-Based Access)
+- Notes are exposed as MCP resources with `note://` URIs
+- Automatic resource listing with metadata
+- Content served as markdown with proper MIME types
 
-### 📝 Prompts
-- **meeting_notes** - Template for meeting notes with customizable title and attendees
-- **daily_journal** - Template for daily journal entries
-- **todo_list** - Template for TODO lists with optional project name
+### 📝 Prompts (Dynamic Templates)
+- **meeting_notes** - Template for structured meeting notes
+- **task_note** - Template for task tracking with priority and due dates
+- **daily_journal** - Template for daily journal entries with default dates
 
-### 🔔 Notifications (TODO)
-- File change notifications when notes are created/updated/deleted
+### 🔔 Notifications (Clean API)
+- Simple notification helpers: `notify.info()`, `notify.warn()`, `notify.error()`
+- Automatic log level handling
+- Real-time updates when notes are modified
 
 ## Running the Server
 
@@ -33,13 +34,13 @@ cd examples/toy
 cargo run
 ```
 
-The server will start on port 3000 by default. You can customize this with the `PORT` environment variable:
+The server will start on port 3002 by default. You can customize this with the `PORT` environment variable:
 
 ```bash
 PORT=8080 cargo run
 ```
 
-Notes are stored in a `notes` directory by default. You can customize this with the `NOTES_DIR` environment variable:
+Notes are stored in a temporary directory by default. You can customize this with the `NOTES_DIR` environment variable:
 
 ```bash
 NOTES_DIR=/path/to/notes cargo run
@@ -47,7 +48,7 @@ NOTES_DIR=/path/to/notes cargo run
 
 ## Testing with Claude Desktop
 
-1. Add the server to your Claude Desktop configuration:
+1. Add the server to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
@@ -68,14 +69,13 @@ NOTES_DIR=/path/to/notes cargo run
 
 ## Example Usage
 
-### Creating a Note
+### Adding a Note
 ```json
 {
-  "tool": "create_note",
+  "tool": "add_note",
   "arguments": {
-    "title": "My First Note",
-    "content": "This is a test note with **markdown** support!",
-    "tags": ["test", "example"]
+    "name": "my-first-note",
+    "content": "This is a test note with **markdown** support!"
   }
 }
 ```
@@ -84,9 +84,7 @@ NOTES_DIR=/path/to/notes cargo run
 ```json
 {
   "tool": "list_notes",
-  "arguments": {
-    "tag": "test"
-  }
+  "arguments": {}
 }
 ```
 
@@ -95,7 +93,7 @@ NOTES_DIR=/path/to/notes cargo run
 {
   "tool": "read_note",
   "arguments": {
-    "id": "uuid-from-list"
+    "name": "my-first-note"
   }
 }
 ```
@@ -114,40 +112,85 @@ NOTES_DIR=/path/to/notes cargo run
 ### Accessing Resources
 Resources can be accessed via their URIs:
 - List all resources: `resources/list`
-- Read a specific note: `resources/read` with URI `note://uuid`
+- Read a specific note: `resources/read` with URI `note://my-first-note`
 
 ## Architecture
 
-This example demonstrates how to build an MCP server using the high-level API from solidmcp:
+This example demonstrates the SolidMCP framework's key concepts:
 
-1. **Tools** - Implement the `McpTool` trait for each tool
-2. **Resources** - Implement the `McpResourceProvider` trait
-3. **Prompts** - Implement the `McpPromptProvider` trait
-4. **Server** - Use `McpServerBuilder` to combine everything
+### 1. **Context-Driven Design**
+```rust
+// Your application state - can be anything!
+#[derive(Debug)]
+struct NotesContext {
+    notes_dir: PathBuf,
+    notes: RwLock<HashMap<String, String>>,
+}
+```
 
-The server handles all the protocol details, letting you focus on implementing your domain logic.
+### 2. **Type-Safe Tools with Auto Schema**
+```rust
+// Input/output types with automatic JSON schema generation
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+struct AddNote {
+    name: String,
+    content: String,
+}
+
+// Simple closure-based tool definition
+.with_tool(
+    "add_note",
+    "Add a new note",
+    |input: AddNote, ctx: Arc<NotesContext>, notify| async move {
+        ctx.save_note(&input.name, &input.content).await?;
+        notify.info(&format!("Note '{}' added", input.name))?;
+        Ok(NoteResult { message: "Success".to_string() })
+    },
+)
+```
+
+### 3. **Resource Providers**
+```rust
+impl ResourceProvider<NotesContext> for NotesResourceProvider {
+    async fn list_resources(&self, context: Arc<NotesContext>) -> Result<Vec<ResourceInfo>> {
+        // Expose your data as MCP resources
+    }
+}
+```
+
+### 4. **Prompt Providers**
+```rust
+impl PromptProvider<NotesContext> for NotesPromptProvider {
+    async fn get_prompt(&self, name: &str, arguments: Option<Value>, context: Arc<NotesContext>) -> Result<PromptContent> {
+        // Generate dynamic templates
+    }
+}
+```
+
+The framework handles all protocol details, session management, transport layers, and error handling automatically.
 
 ## Testing
 
-Integration tests are provided to verify all MCP features work correctly:
+Comprehensive integration tests verify all MCP features:
 
 ```bash
+# Test all functionality
 cargo test --test integration
+
+# Test with logging
+RUST_LOG=debug cargo test --test integration
+
+# Test specific features
+cargo test test_tools
+cargo test test_resources  
+cargo test test_prompts
 ```
 
-## File Format
+## Key Benefits Demonstrated
 
-Notes are stored as markdown files with metadata in the header:
-
-```markdown
-# Note Title
-
-Tags: tag1, tag2
-
-Created: 2024-01-01 12:00:00
-Updated: 2024-01-01 12:00:00
-
----
-
-Note content goes here...
-```
+1. **Minimal Boilerplate**: ~200 lines for a complete MCP server
+2. **Type Safety**: Compile-time validation of tool inputs/outputs
+3. **Auto Schema Generation**: No manual JSON schema writing
+4. **Clean APIs**: Simple notification and error handling
+5. **Full Protocol Support**: Tools, resources, and prompts in one server
+6. **Production Ready**: Proper error handling, logging, and session management

@@ -5,6 +5,24 @@ members = [".", "examples/toy"]
 name = "solidmcp"
 version = "0.1.0"
 edition = "2021"
+description = "A high-level Rust toolkit for building Model Context Protocol (MCP) servers with minimal boilerplate and maximum type safety"
+license = "MIT"
+repository = "https://github.com/yourusername/solidmcp"
+documentation = "https://docs.rs/solidmcp"
+keywords = ["mcp", "model-context-protocol", "ai", "protocol", "server"]
+categories = ["network-programming", "web-programming", "api-bindings"]
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+
+[lib]
+name = "solidmcp"
+path = "src/lib.rs"
+
+# Optional binary for testing/development
+[[bin]]
+name = "solidmcp-server"
+path = "src/main.rs"
+required-features = ["bin"]
 
 [dependencies]
 anyhow = "1.0"
@@ -22,6 +40,10 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.7", features = ["v4"] }
 warp = "0.3"
+
+[features]
+default = []
+bin = []
 
 [dev-dependencies]
 tempfile = "3.8"
