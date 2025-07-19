@@ -5,9 +5,12 @@
 use {
     anyhow::Result,
     async_trait::async_trait,
+    serde_json::Value,
     solidmcp::{
-        framework::ResourceProvider,
-        handler::{ResourceContent, ResourceInfo},
+        framework::{PromptProvider, ResourceProvider},
+        handler::{
+            PromptArgument, PromptContent, PromptInfo, PromptMessage, ResourceContent, ResourceInfo,
+        },
     },
     std::{collections::HashMap, fs, path::PathBuf, sync::Arc},
     tokio::sync::RwLock,
@@ -111,5 +114,118 @@ impl ResourceProvider<NotesContext> for NotesResourceProvider {
             }
         }
         Err(anyhow::anyhow!("Resource not found: {}", uri))
+    }
+}
+
+/// Prompt provider for notes - provides note templates and formatting prompts
+pub struct NotesPromptProvider;
+
+#[async_trait]
+impl PromptProvider<NotesContext> for NotesPromptProvider {
+    async fn list_prompts(&self, _context: Arc<NotesContext>) -> Result<Vec<PromptInfo>> {
+        Ok(vec![
+            PromptInfo {
+                name: "meeting_notes".to_string(),
+                description: Some("Template for creating structured meeting notes".to_string()),
+                arguments: vec![
+                    PromptArgument {
+                        name: "meeting_title".to_string(),
+                        description: Some("The title of the meeting".to_string()),
+                        required: true,
+                    },
+                    PromptArgument {
+                        name: "attendees".to_string(),
+                        description: Some("List of meeting attendees".to_string()),
+                        required: false,
+                    },
+                ],
+            },
+            PromptInfo {
+                name: "task_note".to_string(),
+                description: Some("Template for creating task/todo notes".to_string()),
+                arguments: vec![
+                    PromptArgument {
+                        name: "task_name".to_string(),
+                        description: Some("Name of the task".to_string()),
+                        required: true,
+                    },
+                    PromptArgument {
+                        name: "priority".to_string(),
+                        description: Some("Task priority (high, medium, low)".to_string()),
+                        required: false,
+                    },
+                    PromptArgument {
+                        name: "due_date".to_string(),
+                        description: Some("When the task is due".to_string()),
+                        required: false,
+                    },
+                ],
+            },
+            PromptInfo {
+                name: "daily_journal".to_string(),
+                description: Some("Template for daily journal entries".to_string()),
+                arguments: vec![PromptArgument {
+                    name: "date".to_string(),
+                    description: Some("Date for the journal entry".to_string()),
+                    required: false,
+                }],
+            },
+        ])
+    }
+
+    async fn get_prompt(
+        &self,
+        name: &str,
+        arguments: Option<Value>,
+        _context: Arc<NotesContext>,
+    ) -> Result<PromptContent> {
+        let args = arguments.unwrap_or_default();
+
+        match name {
+            "meeting_notes" => {
+                let meeting_title = args["meeting_title"].as_str().unwrap_or("Meeting");
+                let attendees = args["attendees"].as_str().unwrap_or("TBD");
+
+                Ok(PromptContent {
+                    messages: vec![PromptMessage {
+                        role: "user".to_string(),
+                        content: format!(
+                            "# {}\n\n## Attendees\n{}\n\n## Agenda\n- \n\n## Discussion\n\n\n## Action Items\n- [ ] \n\n## Next Steps\n\n",
+                            meeting_title, attendees
+                        ),
+                    }],
+                })
+            }
+            "task_note" => {
+                let task_name = args["task_name"].as_str().unwrap_or("New Task");
+                let priority = args["priority"].as_str().unwrap_or("medium");
+                let due_date = args["due_date"].as_str().unwrap_or("TBD");
+
+                Ok(PromptContent {
+                    messages: vec![PromptMessage {
+                        role: "user".to_string(),
+                        content: format!(
+                            "# Task: {}\n\n**Priority**: {}\n**Due Date**: {}\n\n## Description\n\n\n## Requirements\n- \n\n## Progress\n- [ ] \n\n## Notes\n\n",
+                            task_name, priority, due_date
+                        ),
+                    }],
+                })
+            }
+            "daily_journal" => {
+                let default_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+                let date = args["date"].as_str().unwrap_or(&default_date);
+
+                Ok(PromptContent {
+                    messages: vec![PromptMessage {
+                        role: "user".to_string(),
+                        content: format!(
+                            "# Daily Journal - {}\n\n## How I'm Feeling\n\n\n## What Happened Today\n\n\n## Accomplishments\n- \n\n## Challenges\n\n\n## Tomorrow's Goals\n- \n\n## Gratitude\n- \n\n",
+                            date
+                        ),
+                    }],
+                })
+            }
+            _ => Err(anyhow::anyhow!("Prompt not found: {}", name)),
+        }
     }
 }

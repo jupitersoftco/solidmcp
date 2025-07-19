@@ -2,6 +2,7 @@
 
 use {
     anyhow::Result,
+    chrono,
     futures_util::{SinkExt, StreamExt},
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
@@ -10,7 +11,7 @@ use {
     tempfile::TempDir,
     tokio::time::timeout,
     tokio_tungstenite::{connect_async, tungstenite::Message},
-    toy_notes_server::{NotesContext, NotesResourceProvider},
+    toy_notes_server::{NotesContext, NotesPromptProvider, NotesResourceProvider},
 };
 
 // Schema definitions
@@ -99,6 +100,7 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
             },
         )
         .with_resource_provider(Box::new(NotesResourceProvider))
+        .with_prompt_provider(Box::new(NotesPromptProvider))
         .build()
         .await
 }
@@ -462,6 +464,327 @@ async fn test_resource_not_found() -> Result<()> {
         .as_str()
         .unwrap()
         .contains("Resource not found"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_list_prompts() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // List prompts
+    let list_prompts_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "prompts/list"
+    });
+
+    write
+        .send(Message::Text(list_prompts_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    let prompts = parsed["result"]["prompts"].as_array().unwrap();
+    assert_eq!(prompts.len(), 3);
+
+    let prompt_names: Vec<&str> = prompts
+        .iter()
+        .map(|p| p["name"].as_str().unwrap())
+        .collect();
+
+    assert!(prompt_names.contains(&"meeting_notes"));
+    assert!(prompt_names.contains(&"task_note"));
+    assert!(prompt_names.contains(&"daily_journal"));
+
+    // Check meeting_notes prompt details
+    let meeting_prompt = prompts
+        .iter()
+        .find(|p| p["name"] == "meeting_notes")
+        .unwrap();
+    assert_eq!(
+        meeting_prompt["description"],
+        "Template for creating structured meeting notes"
+    );
+
+    let arguments = meeting_prompt["arguments"].as_array().unwrap();
+    assert_eq!(arguments.len(), 2);
+    assert_eq!(arguments[0]["name"], "meeting_title");
+    assert_eq!(arguments[0]["required"], true);
+    assert_eq!(arguments[1]["name"], "attendees");
+    assert_eq!(arguments[1]["required"], false);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_meeting_notes_prompt() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Get meeting_notes prompt with arguments
+    let get_prompt_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "prompts/get",
+        "params": {
+            "name": "meeting_notes",
+            "arguments": {
+                "meeting_title": "Weekly Team Sync",
+                "attendees": "Alice, Bob, Charlie"
+            }
+        }
+    });
+
+    write
+        .send(Message::Text(get_prompt_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    let result = &parsed["result"];
+    let messages = result["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+
+    let message = &messages[0];
+    assert_eq!(message["role"], "user");
+
+    let content = message["content"]["text"].as_str().unwrap();
+    assert!(content.contains("# Weekly Team Sync"));
+    assert!(content.contains("Alice, Bob, Charlie"));
+    assert!(content.contains("## Agenda"));
+    assert!(content.contains("## Action Items"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_task_note_prompt() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Get task_note prompt with arguments
+    let get_prompt_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "prompts/get",
+        "params": {
+            "name": "task_note",
+            "arguments": {
+                "task_name": "Implement user authentication",
+                "priority": "high",
+                "due_date": "2025-01-30"
+            }
+        }
+    });
+
+    write
+        .send(Message::Text(get_prompt_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    let result = &parsed["result"];
+    let messages = result["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+
+    let message = &messages[0];
+    assert_eq!(message["role"], "user");
+
+    let content = message["content"]["text"].as_str().unwrap();
+    assert!(content.contains("# Task: Implement user authentication"));
+    assert!(content.contains("**Priority**: high"));
+    assert!(content.contains("**Due Date**: 2025-01-30"));
+    assert!(content.contains("## Requirements"));
+    assert!(content.contains("## Progress"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_daily_journal_prompt() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Get daily_journal prompt with custom date
+    let get_prompt_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "prompts/get",
+        "params": {
+            "name": "daily_journal",
+            "arguments": {
+                "date": "2025-01-19"
+            }
+        }
+    });
+
+    write
+        .send(Message::Text(get_prompt_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    let result = &parsed["result"];
+    let messages = result["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+
+    let message = &messages[0];
+    assert_eq!(message["role"], "user");
+
+    let content = message["content"]["text"].as_str().unwrap();
+    assert!(content.contains("# Daily Journal - 2025-01-19"));
+    assert!(content.contains("## How I'm Feeling"));
+    assert!(content.contains("## Accomplishments"));
+    assert!(content.contains("## Gratitude"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_daily_journal_prompt_default_date() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Get daily_journal prompt without date (should use today)
+    let get_prompt_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "prompts/get",
+        "params": {
+            "name": "daily_journal",
+            "arguments": {}
+        }
+    });
+
+    write
+        .send(Message::Text(get_prompt_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    let result = &parsed["result"];
+    let messages = result["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+
+    let message = &messages[0];
+    assert_eq!(message["role"], "user");
+
+    let content = message["content"]["text"].as_str().unwrap();
+    // Should contain today's date in YYYY-MM-DD format
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    assert!(content.contains(&format!("# Daily Journal - {}", today)));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_nonexistent_prompt() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let port = start_test_server(temp_dir.path().to_path_buf()).await?;
+
+    // Connect and initialize
+    let (ws_stream, _) = connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    write.send(Message::Text(init_request.to_string())).await?;
+    receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+
+    // Try to get a non-existent prompt
+    let get_prompt_request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "prompts/get",
+        "params": {
+            "name": "nonexistent_prompt",
+            "arguments": {}
+        }
+    });
+
+    write
+        .send(Message::Text(get_prompt_request.to_string()))
+        .await?;
+    let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    let parsed: Value = serde_json::from_str(&response)?;
+
+    // Should get an error response
+    assert!(parsed["error"].is_object());
+    assert!(parsed["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Prompt not found"));
 
     Ok(())
 }
