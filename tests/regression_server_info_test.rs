@@ -136,8 +136,9 @@ async fn test_reinitialization_handling() -> Result<()> {
         .await?;
     let reinit_response: Value = response.json().await?;
 
-    // Should succeed (MCP allows re-initialization)
-    assert!(reinit_response["result"].is_object());
+    // Should fail with "Already initialized" (MCP rejects duplicate initialization)
+    assert!(reinit_response["error"].is_object());
+    assert_eq!(reinit_response["error"]["message"], "Already initialized");
 
     println!("✅ Re-initialization handling works correctly!");
     Ok(())
