@@ -52,9 +52,7 @@ impl McpServer {
         let http_handler = HttpMcpHandler::new(self.protocol_engine.clone());
 
         // Combine WebSocket and HTTP routes on the same /mcp path
-        let ws_route = warp::path!("mcp")
-            .and(warp::ws())
-            .and_then(super::websocket::handle_mcp_ws_main);
+        let ws_route = super::websocket::create_ws_handler(self.protocol_engine.clone());
 
         let http_route = http_handler.route();
 

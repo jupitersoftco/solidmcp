@@ -11,7 +11,7 @@ use {
     serde_json::{json, Value},
     std::sync::Arc,
     tracing::{debug, error, info},
-    warp::{ws::Message, ws::WebSocket, ws::Ws, Rejection, Reply},
+    warp::{ws::Message, ws::WebSocket, ws::Ws, Filter, Rejection, Reply},
 };
 
 /// Main WebSocket handler for MCP connections
@@ -33,6 +33,30 @@ pub async fn handle_mcp_ws_main(ws: Ws) -> Result<impl Reply, Rejection> {
 
         info!("🔌 MCP WebSocket connection closed: {:?}", connection_id);
     }))
+}
+
+/// WebSocket handler that accepts a protocol engine
+pub fn create_ws_handler(
+    protocol_engine: Arc<McpProtocolEngine>,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path!("mcp")
+        .and(warp::ws())
+        .and(warp::any().map(move || protocol_engine.clone()))
+        .and_then(|ws: Ws, engine: Arc<McpProtocolEngine>| async move {
+            Ok::<_, Rejection>(ws.on_upgrade(move |websocket| async move {
+                let connection_id = McpConnectionId::new();
+                let logger = McpDebugLogger::new(connection_id.clone());
+
+                info!(
+                    "🔌 MCP WebSocket connection established: {:?}",
+                    connection_id
+                );
+
+                handle_mcp_ws(websocket, logger, engine.clone()).await;
+
+                info!("🔌 MCP WebSocket connection closed: {:?}", connection_id);
+            }))
+        })
 }
 
 /// Handle MCP WebSocket connection
