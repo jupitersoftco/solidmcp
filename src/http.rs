@@ -207,6 +207,46 @@ async fn handle_mcp_http(
     {
         Ok(response) => {
             debug!("📤 HTTP MCP response: {:?}", response);
+
+            // Add response size debugging
+            let response_json = serde_json::to_string(&response).unwrap_or_default();
+            let response_size = response_json.len();
+
+            warn!("🔍 RESPONSE DEBUG:");
+            warn!("   📊 Response size: {} bytes", response_size);
+            warn!("   📊 Response KB: {:.2} KB", response_size as f64 / 1024.0);
+            warn!("   📋 Method: {:?}", method);
+            warn!("   📋 Message ID: {:?}", message_id);
+
+            // Check if this is a tools/call with progress token
+            let has_progress_token = message
+                .get("params")
+                .and_then(|p| p.get("_meta"))
+                .and_then(|m| m.get("progressToken"))
+                .is_some();
+
+            if has_progress_token {
+                warn!("⚡ REQUEST HAS PROGRESS TOKEN - Client expects streaming updates");
+                let progress_token = message
+                    .get("params")
+                    .and_then(|p| p.get("_meta"))
+                    .and_then(|m| m.get("progressToken"));
+                warn!("   🎯 Progress Token: {:?}", progress_token);
+            }
+
+            if response_size > 10000 {
+                warn!(
+                    "⚠️  LARGE RESPONSE WARNING: {} bytes might cause client timeout",
+                    response_size
+                );
+                warn!("⚠️  This could be the ROOT CAUSE of MCP client timeouts!");
+            }
+
+            // Check if response contains massive debug sections
+            if response_json.contains("debug") && response_json.len() > 5000 {
+                warn!("🐛 LARGE DEBUG SECTION DETECTED - This may be causing timeout issues");
+            }
+
             debug!(
                 "🍪 [SESSION] Used session_id for message handling: {:?}",
                 effective_session_id
@@ -215,24 +255,48 @@ async fn handle_mcp_http(
             // MCP uses JSON-RPC error codes in the body, not HTTP status codes
             let status = StatusCode::OK;
 
-            // Create the response with headers
-            let base_reply = reply::with_status(reply::json(&response), status);
-            let (transfer_encoding, connection) = if supports_streaming {
+            // For MCP clients with progress tokens, we should NOT use chunked encoding
+            // This might be causing the timeout issues
+            let use_chunked = supports_streaming && !has_progress_token;
+
+            // Determine if we should use chunked encoding
+            let (transfer_encoding, connection_header) = if use_chunked {
+                warn!("🔄 Using chunked transfer encoding for streaming client");
                 ("chunked", "keep-alive")
             } else {
-                ("", "")
+                warn!("📦 Using standard HTTP response (Content-Length)");
+                ("", "close")
             };
 
             // Create the response with headers
-            let base_reply = reply::with_header(
+            let base_reply = if !use_chunked {
+                warn!("📏 Setting Content-Length: {} bytes", response_size);
+                // For standard responses, set Content-Length and no Transfer-Encoding
                 reply::with_header(
-                    reply::with_header(base_reply, "content-type", "application/json"),
+                    reply::with_header(
+                        reply::with_status(reply::json(&response), status),
+                        "content-type",
+                        "application/json",
+                    ),
+                    "content-length",
+                    response_size.to_string(),
+                )
+            } else {
+                warn!("🔄 Setting Transfer-Encoding: chunked");
+                // For chunked responses, set Transfer-Encoding and no Content-Length
+                reply::with_header(
+                    reply::with_header(
+                        reply::with_status(reply::json(&response), status),
+                        "content-type",
+                        "application/json",
+                    ),
                     "transfer-encoding",
-                    transfer_encoding,
-                ),
-                "connection",
-                connection,
-            );
+                    "chunked",
+                )
+            };
+
+            // Add connection header
+            let base_reply = reply::with_header(base_reply, "connection", connection_header);
 
             // Set session cookie for initialize responses
             let set_cookie_value = if method == "initialize" && response.get("result").is_some() {
@@ -261,10 +325,27 @@ async fn handle_mcp_http(
                 "".to_string()
             };
 
-            let reply = reply::with_header(base_reply, "set-cookie", set_cookie_value);
+            let final_reply = reply::with_header(base_reply, "set-cookie", set_cookie_value);
+
+            warn!("📤 FINAL RESPONSE HEADERS:");
+            warn!("   Content-Type: application/json");
+            warn!(
+                "   Content-Length: {} bytes",
+                if use_chunked { 0 } else { response_size }
+            );
+            warn!(
+                "   Transfer-Encoding: {}",
+                if use_chunked { "chunked" } else { "none" }
+            );
+            warn!("   Connection: {}", connection_header);
+            warn!("   Status: {}", status);
 
             info!("📤 Sending HTTP MCP response with status: {}", status);
-            Ok(reply.into_response())
+
+            // Add a small delay to see if it helps with client timeouts
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+            Ok(final_reply.into_response())
         }
         Err(e) => {
             error!(
