@@ -3,7 +3,7 @@ members = [".", "examples/toy"]
 
 [package]
 name = "solidmcp"
-version = "0.2.0-alpha.2"
+version = "0.2.0-alpha.3"
 edition = "2021"
 description = "A high-level Rust toolkit for building Model Context Protocol (MCP) servers with type safety and minimal boilerplate. Supports tools, resources, and prompts with automatic JSON schema generation."
 license = "MIT"
