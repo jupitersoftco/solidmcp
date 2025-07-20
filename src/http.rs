@@ -291,15 +291,20 @@ async fn handle_mcp_http(
     debug!("🍪 Session ID from cookie: {:?}", session_id);
     debug!("🍪 Effective session ID: {:?}", effective_session_id);
 
-    // Check if client supports streaming (Cursor typically sends this)
-    let supports_streaming = accept.contains("text/event-stream")
-        || connection.to_lowercase().contains("keep-alive")
-        || connection.to_lowercase().contains("upgrade");
+    // === MODERN HTTP/1.1 CHUNKED ENCODING STRATEGY ===
+    // Per HTTP/1.1 specification and MCP best practices, always use chunked encoding
+    // for dynamic content. This eliminates complex client detection logic and ensures
+    // consistent behavior with Cursor and other MCP clients.
+    let use_chunked = true;
 
     info!(
-        "🔍 Client streaming support: {} (Accept: {}, Connection: {})",
-        supports_streaming, accept, connection
+        "🔧 Using Chunked Encoding: {} (Accept: {}, Connection: {})",
+        use_chunked, accept, connection
     );
+
+    if use_chunked {
+        info!("📡 HTTP/1.1 Chunked encoding enabled for MCP compliance");
+    }
 
     // Check if this is a tools/call with progress token
     let has_progress_token = message
@@ -327,11 +332,6 @@ async fn handle_mcp_http(
     } else {
         None
     };
-
-    // === CURSOR MCP STREAMABLE HTTP TRANSPORT REQUIREMENT ===
-    // Cursor expects chunked encoding for progress notifications per Streamable HTTP transport spec
-    // Reference: https://docs.cursor.com/context/mcp
-    let use_chunked = supports_streaming || has_progress_token;
 
     if has_progress_token {
         warn!("🚀 ENABLING CHUNKED ENCODING for Cursor MCP Streamable HTTP transport");
@@ -530,7 +530,6 @@ async fn handle_mcp_http(
             info!("🔧 === HTTP RESPONSE HEADERS ANALYSIS ===");
             info!("   Request ID: {}", request_id);
             info!("   Use Chunked: {}", use_chunked);
-            info!("   Supports Streaming: {}", supports_streaming);
             info!("   Has Progress Token: {}", has_progress_token);
             info!("   Connection Header: {}", connection_header);
 
