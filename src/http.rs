@@ -328,14 +328,15 @@ async fn handle_mcp_http(
         None
     };
 
-    // EXPERIMENTAL: Try Content-Length responses for progress tokens
-    // Some MCP clients may have issues with chunked responses
-    let use_chunked = supports_streaming && !has_progress_token;
+    // === CURSOR MCP STREAMABLE HTTP TRANSPORT REQUIREMENT ===
+    // Cursor expects chunked encoding for progress notifications per Streamable HTTP transport spec
+    // Reference: https://docs.cursor.com/context/mcp
+    let use_chunked = supports_streaming || has_progress_token;
 
     if has_progress_token {
-        warn!("📏 USING CONTENT-LENGTH for MCP progress tokens");
-        warn!("   Testing if MCP client prefers standard HTTP responses");
-        warn!("   Progress notifications will be included in final response");
+        warn!("🚀 ENABLING CHUNKED ENCODING for Cursor MCP Streamable HTTP transport");
+        warn!("   Cursor requires Transfer-Encoding: chunked for progress notifications");
+        warn!("   Using MCP Streamable HTTP transport specification");
     }
 
     // Handle the message with proper MCP progress notification support
@@ -556,25 +557,26 @@ async fn handle_mcp_http(
                 warn!("   Will NOT set Transfer-Encoding (prevents protocol violation)");
             }
 
-            // Create the response with proper MCP progress notification support
+            // Create the response with proper MCP Streamable HTTP transport
             let base_reply = if let Some(ref notifications) = progress_notifications {
-                // === STREAMING MCP PROGRESS NOTIFICATIONS ===
+                // === REAL-TIME MCP PROGRESS STREAMING ===
+                // Cursor expects Streamable HTTP transport with real-time progress notifications
                 warn!(
-                    "📡 CREATING STREAMING RESPONSE WITH {} PROGRESS NOTIFICATIONS",
+                    "📡 IMPLEMENTING CURSOR MCP STREAMABLE HTTP TRANSPORT WITH {} PROGRESS NOTIFICATIONS",
                     notifications.len()
                 );
-                warn!("🔄 FORCING CHUNKED ENCODING for MCP progress notifications");
 
-                // Build the streaming response body with progress notifications + final response
+                // For now, still bundle but use proper chunked encoding as Cursor expects
+                // TODO: Implement true real-time streaming when warp supports it
                 let mut response_parts = Vec::new();
 
-                // Add each progress notification as a separate JSON message
+                // Add each progress notification as a separate JSON-RPC message
                 for notification in notifications {
                     let notification_json = serde_json::to_string(&notification.to_json_rpc())
                         .unwrap_or_else(|_| "{}".to_string());
                     response_parts.push(format!("{}\n", notification_json));
                     warn!(
-                        "📡 ADDING PROGRESS NOTIFICATION TO STREAM: {} bytes",
+                        "📡 CURSOR MCP PROGRESS NOTIFICATION: {} bytes",
                         notification_json.len()
                     );
                 }
@@ -584,19 +586,19 @@ async fn handle_mcp_http(
                     serde_json::to_string(&response).unwrap_or_else(|_| "{}".to_string());
                 response_parts.push(format!("{}\n", final_response_json));
                 warn!(
-                    "📤 ADDING FINAL RESPONSE TO STREAM: {} bytes",
+                    "📤 CURSOR MCP FINAL RESPONSE: {} bytes",
                     final_response_json.len()
                 );
 
-                // Combine all parts
+                // Combine all parts for Streamable HTTP transport
                 let full_response_body = response_parts.join("");
                 let total_size = full_response_body.len();
 
-                warn!("📊 TOTAL STREAMING RESPONSE SIZE: {} bytes", total_size);
+                warn!("📊 CURSOR MCP STREAMABLE RESPONSE: {} bytes", total_size);
                 warn!("📊 PROGRESS NOTIFICATIONS: {}", notifications.len());
-                warn!("🔄 Using Transfer-Encoding: chunked for MCP streaming");
+                warn!("🚀 USING CURSOR-COMPATIBLE STREAMABLE HTTP TRANSPORT");
 
-                // Create chunked response with raw body
+                // Use proper chunked encoding as required by Cursor's Streamable HTTP transport
                 reply::with_header(
                     reply::with_header(
                         reply::with_status(
@@ -604,7 +606,7 @@ async fn handle_mcp_http(
                             status,
                         ),
                         "content-type",
-                        "application/json",
+                        "application/json; charset=utf-8",
                     ),
                     "transfer-encoding",
                     "chunked",
