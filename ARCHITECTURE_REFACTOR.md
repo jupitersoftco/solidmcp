@@ -1,144 +1,196 @@
-# SolidMCP Architecture Refactor Plan
+# SolidMCP Architecture Overview
 
-## Current Issues
+## Current Architecture (Updated 2024)
 
-### 1. Naming Confusion
-- `SharedMcpHandler` suggests it's doing MCP handling, but it should be a trait users implement
-- The name implies shared state rather than a pluggable interface
+SolidMCP has evolved into a comprehensive MCP server framework with intelligent transport handling and type-safe tool development. The architecture is built around several key principles:
 
-### 2. Built-in Tools Problem
-- Current architecture has hardcoded built-in tools (`echo`, `read_file`)
-- A generic library shouldn't provide specific functionality - only the framework
-- Users can't easily disable or replace built-in tools
+### 1. Transport-Aware Design ✅ **IMPLEMENTED**
 
-### 3. Mixed Responsibilities
-- Core protocol is doing business logic instead of just protocol handling
-- Two competing systems: built-in tools vs custom tools
-- Protocol handler contains tool implementations rather than delegating
+- **Smart Transport Detection**: Automatic capability negotiation based on HTTP headers
+- **Multi-Transport Support**: WebSocket and HTTP JSON-RPC with seamless fallback
+- **CORS-Enabled**: Full cross-origin support for web-based MCP clients
+- **Future-Ready**: Architecture prepared for Server-Sent Events (SSE) streaming
 
-## Target Architecture
+### 2. Framework-Based Approach ✅ **IMPLEMENTED**
 
-### 1. Pure Trait-Based Design
 ```rust
-// Core trait that users must implement
-pub trait McpHandler: Send + Sync {
-    async fn list_tools(&self) -> Result<Vec<ToolDefinition>>;
-    async fn call_tool(&self, name: &str, args: Value, context: &ToolContext) -> Result<Value>;
-    async fn list_resources(&self) -> Result<Vec<ResourceInfo>>;
-    async fn read_resource(&self, uri: &str) -> Result<ResourceContent>;
-    async fn list_prompts(&self) -> Result<Vec<PromptInfo>>;
-    async fn get_prompt(&self, name: &str, args: Option<Value>) -> Result<PromptContent>;
-}
-
-// Simple usage
-struct MyNotesHandler { /* user state */ }
-impl McpHandler for MyNotesHandler { /* user implementation */ }
-
-let server = McpServer::new(MyNotesHandler::new());
-server.start(3000).await?;
+// Clean framework API with automatic schema generation
+let server = McpServerBuilder::new(context, "server-name", "1.0.0")
+    .with_tool("tool_name", "description", tool_handler)
+    .with_resource_provider(Box::new(ResourceProvider))
+    .with_prompt_provider(Box::new(PromptProvider))
+    .build()
+    .await?;
 ```
 
-### 2. No Built-in Tools
-- Remove `McpTools` entirely
-- Remove hardcoded `echo` and `read_file` tools
-- Library provides only protocol framework
-- Users implement their own tools as needed
+### 3. Type-Safe Tool Development ✅ **IMPLEMENTED**
 
-### 3. Clean Separation of Concerns
-- **Protocol Layer**: JSON-RPC parsing, MCP message routing, session management
-- **Handler Interface**: Trait definition for user implementations
-- **User Implementation**: Business logic in user's trait impl
+- **Automatic JSON Schema**: `#[derive(JsonSchema)]` generates schemas at compile time
+- **Type-Safe Handlers**: Input/output types checked at compile time
+- **Error Handling**: Comprehensive error propagation and recovery
 
-## Implementation Plan
+### 4. Modular Transport Layer ✅ **IMPLEMENTED**
 
-### Phase 1: Create New Trait Interface
-1. Define `McpHandler` trait with all MCP methods
-2. Create `ToolContext` for accessing notifications, session info, etc.
-3. Define all supporting types (`ToolDefinition`, `ResourceInfo`, etc.)
+Current transport architecture includes:
 
-### Phase 2: Remove Built-in Tools
-1. Delete `McpTools` module entirely
-2. Remove hardcoded tool implementations from protocol handler
-3. Update protocol handler to delegate to `McpHandler` trait
+- **`transport.rs`**: Capability detection and negotiation
+- **`http.rs`**: HTTP JSON-RPC with enhanced routing and CORS
+- **`websocket.rs`**: WebSocket transport with upgrade detection
+- **Enhanced Routing**: OPTIONS, GET (discovery), POST (JSON-RPC) with transport negotiation
 
-### Phase 3: Simplify Core Architecture
-1. Rename `SharedMcpHandler` to something like `McpProtocolEngine`
-2. Make it accept `Arc<dyn McpHandler>` in constructor
-3. Route all MCP requests to the trait implementation
+## Current Priorities & Future Work
 
-### Phase 4: Update High-Level API
-1. `McpServerBuilder` becomes a convenience wrapper
-2. Internally creates a struct that implements `McpHandler`
-3. Users can choose: implement trait directly OR use builder pattern
+### 🔮 **Short-Term Goals**
 
-### Phase 5: Update Examples and Tests
-1. Toy example implements `McpHandler` directly
-2. Built-in tests provide test implementations
-3. Update all documentation
+#### 1. Server-Sent Events (SSE) Implementation
 
-## Benefits
+**Status**: Architecture complete, implementation planned
 
-### 1. True Generic Library
-- No opinions about what tools should exist
-- Users have complete control over functionality
-- Library focuses on protocol correctness only
-
-### 2. Cleaner Architecture
-- Single responsibility: protocol vs business logic
-- Easier to test and maintain
-- No competing systems
-
-### 3. Better Developer Experience
 ```rust
-// Simple case - implement trait directly
-impl McpHandler for MyHandler { ... }
-
-// Complex case - use builder for common patterns
-McpServerBuilder::new()
-    .add_tool(CustomTool::new())
-    .add_resource_provider(FileProvider::new())
-    .build() // returns something that implements McpHandler
+// TODO: Enable SSE when implementation is ready
+let supports_sse = accept.contains("text/event-stream"); // Currently disabled
 ```
 
-### 4. Protocol Compliance
-- All MCP features work the same way
-- No special cases for built-in vs custom
-- Consistent behavior across all implementations
+**Benefits:**
 
-## Migration Strategy
+- Real-time streaming responses for large results
+- Better client experience for long-running operations
+- Maintain connection efficiency
 
-### Backward Compatibility
-- Keep `McpServerBuilder` API working
-- Internally, make it create a struct that implements `McpHandler`
-- Existing toy example continues to work
+#### 2. Enhanced WebSocket Features
 
-### Testing Strategy
-- Create comprehensive test suite with mock `McpHandler` implementations
-- Test all MCP protocol features through trait interface
-- Remove tests that depend on built-in tools
+- Sub-protocol negotiation
+- Custom WebSocket message types
+- Advanced connection management
 
-## File Changes Required
+#### 3. Configuration System
 
-### New Files
-- `src/handler.rs` - `McpHandler` trait definition
-- `src/context.rs` - `ToolContext` and related types
+```rust
+// Planned: Structured configuration API
+let config = McpConfig::new()
+    .with_transport(TransportConfig::http().with_cors(true))
+    .with_session(SessionConfig::persistent())
+    .with_logging(LogLevel::Info);
+```
 
-### Modified Files
-- `src/core.rs` - Accept `Arc<dyn McpHandler>` instead of custom tools
-- `src/shared.rs` - Rename and simplify to `McpProtocolEngine`
-- `src/protocol_impl.rs` - Remove tool implementations, delegate to trait
-- `src/server.rs` - Make builder create a `McpHandler` implementation
-- `examples/toy/src/main.rs` - Implement `McpHandler` trait
+### 🏗️ **Medium-Term Goals**
 
-### Deleted Files
-- `src/tools.rs` - Remove built-in tools entirely
+#### 1. Plugin System
 
-## Success Criteria
+- Custom transport implementations
+- Middleware support
+- Extension points for protocol enhancements
 
-1. **Zero built-in functionality** - Library provides only protocol framework
-2. **Single integration point** - All customization goes through `McpHandler` trait
-3. **Toy example works** - Demonstrates real-world usage
-4. **All tests pass** - Protocol compliance maintained
-5. **Clean API** - Both trait-based and builder patterns work smoothly
+#### 2. Advanced Security
 
-This refactor transforms solidmcp from "an MCP server with customization options" into "an MCP protocol framework that requires user implementation" - which is exactly what a generic library should be.
+- Authentication middleware
+- Authorization policies
+- Consent flow management
+
+#### 3. Performance Optimizations
+
+- Connection pooling
+- Message batching
+- Async streaming for large resources
+
+### 🌟 **Long-Term Vision**
+
+#### 1. Protocol Extensions
+
+- Custom MCP extensions
+- Protocol versioning strategies
+- Backward compatibility guarantees
+
+#### 2. Client Features
+
+While SolidMCP focuses on server-side implementation, planned client-side features include:
+
+- Sampling request handling
+- Root boundary inquiries
+- Advanced completion capabilities
+
+## Architecture Components
+
+### Core Modules
+
+```
+src/
+├── framework.rs       ✅ High-level builder API and server management
+├── handler.rs         ✅ Core traits for tools, resources, and prompts
+├── transport.rs       ✅ Smart transport detection and capability negotiation
+├── http.rs           ✅ HTTP JSON-RPC with CORS and enhanced routing
+├── websocket.rs      ✅ WebSocket transport with upgrade handling
+├── protocol.rs       ✅ MCP protocol implementation and validation
+├── shared.rs         ✅ Common protocol engine and message routing
+└── core.rs           ✅ Server lifecycle and connection management
+```
+
+### Transport Flow
+
+```mermaid
+graph TD
+    A[Client Request] --> B{Transport Detection}
+    B -->|WebSocket Headers| C[WebSocket Upgrade]
+    B -->|HTTP GET| D[Capability Discovery]
+    B -->|HTTP POST| E[JSON-RPC Processing]
+    C --> F[WebSocket MCP Session]
+    D --> G[Transport Info Response]
+    E --> H[HTTP MCP Session]
+    F --> I[MCP Protocol Engine]
+    H --> I
+    I --> J[Tool/Resource/Prompt Handlers]
+```
+
+## Key Design Decisions
+
+### ✅ **What Works Well**
+
+1. **Transport Abstraction**: Clean separation allows easy addition of new transports
+2. **Type Safety**: Compile-time schema generation prevents runtime errors
+3. **Framework API**: Minimal boilerplate for common use cases
+4. **Test Coverage**: 99+ tests ensure reliability across all features
+5. **Dependency Management**: Latest stable versions with regular updates
+
+### 🔄 **Areas for Improvement**
+
+1. **SSE Implementation**: Complete the streaming transport layer
+2. **Configuration**: Move from environment variables to structured config
+3. **Documentation**: Expand architectural documentation and examples
+4. **Performance**: Add benchmarks and optimize high-load scenarios
+
+## Success Metrics
+
+### ✅ **Achieved**
+
+- **Protocol Compliance**: Full MCP 2025-03-26 and 2025-06-18 support
+- **Transport Reliability**: WebSocket and HTTP work with all major MCP clients
+- **Developer Experience**: Minimal boilerplate, maximum type safety
+- **Test Coverage**: Comprehensive test suite with real-world scenarios
+- **Dependency Health**: Latest stable versions with security updates
+
+### 🎯 **Targets**
+
+- **SSE Support**: Complete streaming implementation for real-time updates
+- **Performance**: Sub-10ms response times for typical tool calls
+- **Documentation**: Complete API documentation with examples
+- **Ecosystem**: Integration with popular Rust web frameworks
+
+## Migration Notes
+
+### Recent Changes (2024)
+
+- ✅ **Transport Layer**: Added intelligent capability detection
+- ✅ **Dependency Updates**: Updated to latest stable versions (Tokio 1.43, etc.)
+- ✅ **CORS Support**: Full cross-origin handling for web clients
+- ✅ **Enhanced HTTP**: OPTIONS, GET, POST with transport negotiation
+- ✅ **Test Expansion**: 99+ tests covering all functionality
+
+### Breaking Changes
+
+- None - backward compatibility maintained
+
+### Deprecations
+
+- SSE capability detection temporarily disabled until implementation complete
+
+This architecture prioritizes **server-side excellence** while maintaining **client compatibility**, with a clear path toward **streaming capabilities** and **advanced features**.

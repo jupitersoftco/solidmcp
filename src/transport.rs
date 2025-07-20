@@ -23,7 +23,7 @@ pub struct TransportCapabilities {
 impl TransportCapabilities {
     /// Detect transport capabilities from HTTP headers
     pub fn from_headers(headers: &HeaderMap<HeaderValue>) -> Self {
-        let accept = headers
+        let _accept = headers
             .get("accept")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
@@ -53,7 +53,9 @@ impl TransportCapabilities {
         let supports_websocket = upgrade.to_lowercase().contains("websocket")
             && connection.to_lowercase().contains("upgrade");
 
-        let supports_sse = accept.contains("text/event-stream");
+        // TODO: SSE support - currently disabled until properly implemented
+        // Client detection: let supports_sse = accept.contains("text/event-stream");
+        let supports_sse = false; // Force disable SSE advertising until implementation complete
 
         let supports_http_only = !supports_websocket && !supports_sse;
 
@@ -322,18 +324,19 @@ mod tests {
     }
 
     #[test]
-    fn test_sse_capability_detection() {
+    fn test_sse_capability_detection_disabled() {
         let mut headers = HeaderMap::new();
         headers.insert("accept", HeaderValue::from_static("text/event-stream"));
 
         let capabilities = TransportCapabilities::from_headers(&headers);
 
+        // SSE is currently disabled, so should fall back to HTTP-only
         assert!(!capabilities.supports_websocket);
-        assert!(capabilities.supports_sse);
-        assert!(!capabilities.supports_http_only);
+        assert!(!capabilities.supports_sse); // TODO: Will be true when SSE is implemented
+        assert!(capabilities.supports_http_only);
         assert_eq!(
             capabilities.preferred_transport(),
-            TransportType::ServerSentEvents
+            TransportType::HttpOnly // Falls back to HTTP when SSE unavailable
         );
     }
 

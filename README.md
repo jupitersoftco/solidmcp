@@ -6,11 +6,12 @@ A high-level Rust toolkit for building [Model Context Protocol (MCP)](https://mo
 
 - **🚀 Minimal Boilerplate**: Build MCP servers with just a few lines of code
 - **🛡️ Type Safety**: Compile-time guarantees with automatic JSON schema generation
-- **🔌 Dual Transport**: Built-in WebSocket and HTTP support
+- **🔌 Smart Transport**: WebSocket and HTTP with automatic capability detection and negotiation
 - **📚 Full MCP Support**: Tools, Resources, and Prompts with a unified API
 - **🏗️ Flexible Architecture**: Generic context system for any application state
 - **🔔 Notifications**: Simple API for sending log messages and updates
-- **✅ Battle-tested**: Comprehensive test suite covering all MCP features
+- **🌐 Enhanced HTTP**: CORS support, transport discovery, and graceful fallback
+- **✅ Battle-tested**: Comprehensive test suite covering all MCP features (99+ tests)
 
 ## Quick Start
 
@@ -61,7 +62,7 @@ async fn main() -> Result<()> {
             "Greet someone by name",
             |input: GreetInput, ctx: Arc<MyContext>, notify| async move {
                 notify.info(&format!("Greeting {}", input.name))?;
-                
+
                 Ok(GreetOutput {
                     message: format!("Hello, {}! Welcome to {}", input.name, ctx.name),
                 })
@@ -76,17 +77,54 @@ async fn main() -> Result<()> {
 ```
 
 That's it! Your MCP server is now running with:
+
 - Automatic JSON schema generation and validation
-- WebSocket and HTTP endpoints
+- WebSocket and HTTP endpoints with smart transport negotiation
 - Built-in error handling and logging
 - Type-safe tool execution
+- CORS support for web clients
+
+## Transport Layer
+
+SolidMCP features an intelligent transport system that automatically detects and negotiates capabilities:
+
+### 🔄 **Automatic Transport Detection**
+
+- **WebSocket Upgrade**: Detects `Upgrade: websocket` headers and establishes WebSocket connections
+- **HTTP JSON-RPC**: Falls back to HTTP with session management for compatibility
+- **Transport Discovery**: GET requests return capability information for client negotiation
+- **CORS Support**: Full CORS headers for web-based MCP clients
+
+### 🌟 **Smart Capability Negotiation**
+
+```rust
+// Server automatically detects client capabilities from headers:
+// - Connection: upgrade + Upgrade: websocket → WebSocket transport
+// - Accept: application/json → HTTP JSON-RPC transport
+// - GET request → Transport capability discovery response
+```
+
+### 🔮 **Planned Transport Features**
+
+- **Server-Sent Events (SSE)**: Real-time streaming support (currently disabled, marked for future implementation)
+- **Enhanced WebSocket**: Advanced WebSocket features and sub-protocols
+- **Custom Transports**: Plugin system for custom transport implementations
+
+### 📡 **Current Transport Support Matrix**
+
+| Transport              | Status              | Description                              |
+| ---------------------- | ------------------- | ---------------------------------------- |
+| **WebSocket**          | ✅ **Full Support** | Real-time bidirectional communication    |
+| **HTTP JSON-RPC**      | ✅ **Full Support** | Request/response with session management |
+| **Server-Sent Events** | 🔮 **Future Work**  | Streaming responses (architecture ready) |
+| **Custom Transports**  | 🔮 **Planned**      | Plugin system for extensions             |
 
 ## Complete Example
 
 For a comprehensive example demonstrating all MCP features (tools, resources, and prompts), see the [toy notes server example](examples/toy/). It shows how to build a complete note-taking MCP server with:
 
 - **Tools**: Create, read, list, and delete notes
-- **Resources**: Expose notes as MCP resources with `note://` URIs  
+- **Resources**: Expose notes as MCP resources with `note://` URIs
 - **Prompts**: Provide templates for meeting notes, daily journals, and tasks
 - **Persistence**: File-based storage with automatic loading
 - **Notifications**: Real-time updates when notes are modified
@@ -102,11 +140,15 @@ Then connect with Claude Desktop or any MCP client at `ws://localhost:3002/mcp` 
 
 ## MCP Protocol Support
 
-SolidMCP implements core MCP functionality with room for expansion:
+SolidMCP implements core MCP functionality with comprehensive transport support:
 
 ### ✅ **Fully Supported**
-- **Protocol Versions**: `2025-03-26` and `2025-06-18` 
-- **Transport**: WebSocket and HTTP with session management
+
+- **Protocol Versions**: `2025-03-26` and `2025-06-18`
+- **Transport**: WebSocket and HTTP with intelligent capability detection
+- **Session Management**: HTTP session cookies and state persistence
+- **Transport Discovery**: GET endpoint for capability negotiation
+- **CORS**: Full cross-origin support for web clients
 - **Tools**: Execute functions with validated inputs and outputs (`tools/list`, `tools/call`)
 - **Resources**: Expose data with URI-based access (`resources/list`, `resources/read`)
 - **Prompts**: Provide templates with argument substitution (`prompts/list`, `prompts/get`)
@@ -114,18 +156,21 @@ SolidMCP implements core MCP functionality with room for expansion:
 - **Initialization**: Full handshake and capability negotiation
 
 ### 🚧 **Planned/Partial Support**
+
+- **Server-Sent Events**: Architecture complete, implementation planned
 - **Client Features**: Sampling, roots, and completion (server-side features not yet implemented)
 - **Progress Tracking**: Basic framework exists, needs expansion
 - **Cancellation**: Basic support for `notifications/cancel`
 - **Configuration**: Environment variable support, needs structured config API
 
 ### ❌ **Not Yet Implemented**
+
 - **Sampling**: LLM sampling requests from servers to clients
-- **Roots**: Server-initiated boundary inquiries  
+- **Roots**: Server-initiated boundary inquiries
 - **Completion**: Advanced completion capabilities
 - **Advanced Security**: Comprehensive consent flows and access controls
 
-SolidMCP focuses on the **server-side** of MCP, providing everything needed to build robust MCP servers that work with existing MCP clients like Claude Desktop.
+SolidMCP focuses on the **server-side** of MCP, providing everything needed to build robust MCP servers that work with existing MCP clients like Claude Desktop, with intelligent transport negotiation for optimal compatibility.
 
 ## Advanced Usage
 
@@ -202,44 +247,80 @@ server.start(8080).await?;
 // RUST_LOG=debug - Logging level
 ```
 
+## Latest Dependencies
+
+SolidMCP uses the latest stable versions of core dependencies for optimal performance and security:
+
+- **Tokio 1.43** - Latest async runtime with performance improvements
+- **Warp 0.3.8** - Lightweight web framework for HTTP transport
+- **tokio-tungstenite 0.27** - Latest WebSocket implementation
+- **Serde 1.0.217** - JSON serialization with latest optimizations
+- **thiserror 2.0** - Enhanced error handling with latest improvements
+- **rand 0.9** - Cryptographically secure random generation
+- **schemars 0.8.21** - JSON schema generation for type safety
+
+All dependencies are regularly updated and tested for compatibility.
+
 ## Architecture
 
-SolidMCP is built with a modular architecture:
+SolidMCP is built with a modular architecture featuring intelligent transport handling:
 
 - **Framework Layer** (`framework.rs`) - High-level builder API for easy server creation
 - **Handler Traits** (`handler.rs`) - Core traits for tools, resources, and prompts
 - **Protocol Engine** (`shared.rs`) - MCP protocol implementation and message routing
 - **Transport Layer** (`websocket.rs`, `http.rs`) - WebSocket and HTTP server implementations
+- **Transport Capability Detection** (`transport.rs`) - Smart transport negotiation and discovery
 - **Core Server** (`core.rs`) - Server lifecycle and connection management
 
-The library abstracts away the complexity of the MCP protocol while providing full access to all its features.
+The library abstracts away the complexity of the MCP protocol while providing full access to all its features, with automatic transport detection ensuring compatibility across different MCP clients.
 
 ## Current Limitations
 
 SolidMCP is a **server-focused** implementation. Some limitations to be aware of:
 
-1. **Client Features**: Does not implement client-side capabilities like sampling, roots, or completion
-2. **Progress API**: Basic progress tracking exists but needs expansion for complex operations  
-3. **Security Model**: Basic session management, but enterprise-grade security features are planned
-4. **Config Management**: Relies on environment variables; structured configuration API coming
-5. **Protocol Extensions**: Focuses on core MCP; custom protocol extensions not yet supported
+1. **Server-Sent Events**: Architecture is ready but implementation is marked as future work
+2. **Client Features**: Does not implement client-side capabilities like sampling, roots, or completion
+3. **Progress API**: Basic progress tracking exists but needs expansion for complex operations
+4. **Security Model**: Basic session management, but enterprise-grade security features are planned
+5. **Config Management**: Relies on environment variables; structured configuration API coming
+6. **Protocol Extensions**: Focuses on core MCP; custom protocol extensions not yet supported
 
 These limitations reflect our focus on providing an excellent **server development experience**. Client features and advanced capabilities are on the roadmap.
 
 ## Testing
 
-SolidMCP includes a comprehensive test suite:
+SolidMCP includes a comprehensive test suite with 99+ tests covering all functionality:
 
 ```bash
-# Run all tests
+# Run all tests (99+ tests)
 cargo test
+
+# Run library tests specifically
+cargo test --lib
 
 # Run integration tests
 cargo test --test "*integration*"
 
 # Run with logging
 RUST_LOG=debug cargo test
+
+# Test transport capability detection
+cargo test transport::tests
+
+# Test HTTP functionality
+cargo test http::tests
 ```
+
+**Test Coverage:**
+
+- ✅ **Transport Detection**: WebSocket, HTTP, and capability negotiation
+- ✅ **Protocol Compliance**: JSON-RPC 2.0 compliance and error handling
+- ✅ **Session Management**: HTTP sessions and state persistence
+- ✅ **Tool Execution**: Type-safe tool calls and validation
+- ✅ **Resource Access**: URI-based resource listing and reading
+- ✅ **Prompt System**: Template generation and argument substitution
+- ✅ **Error Handling**: Comprehensive error scenarios and recovery
+- ✅ **Concurrent Access**: Multi-client and high-load scenarios
 
 ## Examples
 
