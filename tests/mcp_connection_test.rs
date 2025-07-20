@@ -31,10 +31,10 @@ async fn test_mcp_connection_basic() -> Result<(), Box<dyn std::error::Error + S
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&tools_message)?))
+                .send(Message::Text(serde_json::to_string(&tools_message)?.into()))
                 .await?;
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], 2);
@@ -61,7 +61,7 @@ async fn test_mcp_connection_basic() -> Result<(), Box<dyn std::error::Error + S
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&echo_message)?))
+                .send(Message::Text(serde_json::to_string(&echo_message)?.into()))
                 .await?;
             let echo_response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             let echo_response: Value = serde_json::from_str(&echo_response_text)?;
@@ -85,7 +85,7 @@ async fn test_mcp_connection_basic() -> Result<(), Box<dyn std::error::Error + S
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&read_message)?))
+                .send(Message::Text(serde_json::to_string(&read_message)?.into()))
                 .await?;
             let read_response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             let read_response: Value = serde_json::from_str(&read_response_text)?;
@@ -173,7 +173,7 @@ async fn test_mcp_unknown_tool_error() -> Result<(), Box<dyn std::error::Error +
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&unknown_message)?))
+                .send(Message::Text(serde_json::to_string(&unknown_message)?.into()))
                 .await?;
             let unknown_response_text =
                 receive_ws_message(&mut read, Duration::from_secs(2)).await?;
@@ -223,7 +223,7 @@ async fn test_mcp_connection_lifecycle() -> Result<(), Box<dyn std::error::Error
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&init_message)?))
+            .send(Message::Text(serde_json::to_string(&init_message)?.into()))
             .await?;
         let _init_response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
         info!("✅ Initialized connection");
@@ -237,7 +237,7 @@ async fn test_mcp_connection_lifecycle() -> Result<(), Box<dyn std::error::Error
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&tools_message)?))
+            .send(Message::Text(serde_json::to_string(&tools_message)?.into()))
             .await?;
         let _tools_response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
         info!("✅ Used connection successfully");

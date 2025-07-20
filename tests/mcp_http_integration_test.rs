@@ -170,14 +170,14 @@ async fn test_mcp_websocket_still_works() -> Result<(), Box<dyn std::error::Erro
 
         debug!("📤 Sending WebSocket initialize message");
         write
-            .send(Message::Text(serde_json::to_string(&init_message)?))
+            .send(Message::Text(serde_json::to_string(&init_message)?.into()))
             .await?;
 
         // Receive response
         let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
         debug!("📥 WebSocket initialize response: {}", response_text);
 
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
         assert_eq!(response["jsonrpc"], "2.0");
         assert_eq!(response["id"], 1);
         assert!(response.get("result").is_some());
@@ -194,13 +194,13 @@ async fn test_mcp_websocket_still_works() -> Result<(), Box<dyn std::error::Erro
 
         debug!("📤 Sending WebSocket tools/list message");
         write
-            .send(Message::Text(serde_json::to_string(&tools_message)?))
+            .send(Message::Text(serde_json::to_string(&tools_message)?.into()))
             .await?;
 
         let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
         debug!("📥 WebSocket tools/list response: {}", response_text);
 
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
         assert_eq!(response["jsonrpc"], "2.0");
         assert_eq!(response["id"], 2);
         assert!(response.get("result").is_some());
@@ -231,13 +231,13 @@ async fn test_mcp_websocket_still_works() -> Result<(), Box<dyn std::error::Erro
 
         debug!("📤 Sending WebSocket echo tool call");
         write
-            .send(Message::Text(serde_json::to_string(&echo_message)?))
+            .send(Message::Text(serde_json::to_string(&echo_message)?.into()))
             .await?;
 
         let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
         debug!("📥 WebSocket echo response: {}", response_text);
 
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
         assert_eq!(response["jsonrpc"], "2.0");
         assert_eq!(response["id"], 3);
         assert!(response.get("result").is_some());
@@ -315,11 +315,13 @@ async fn test_mcp_dual_transport() -> Result<(), Box<dyn std::error::Error + Sen
 
         debug!("📤 Sending WebSocket initialize message");
         write
-            .send(Message::Text(serde_json::to_string(&ws_init_message)?))
+            .send(Message::Text(
+                serde_json::to_string(&ws_init_message)?.into(),
+            ))
             .await?;
 
         let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
         assert_eq!(response["jsonrpc"], "2.0");
         assert_eq!(response["id"], 2);
 
@@ -368,11 +370,13 @@ async fn test_mcp_dual_transport() -> Result<(), Box<dyn std::error::Error + Sen
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&ws_echo_message)?))
+            .send(Message::Text(
+                serde_json::to_string(&ws_echo_message)?.into(),
+            ))
             .await?;
 
         let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
         assert_eq!(response["id"], 4);
         assert!(response["result"]["content"][0]["text"]
             .as_str()

@@ -46,10 +46,10 @@ async fn test_mcp_error_codes() {
             let (ws_stream, _) = tokio_tungstenite::connect_async(&server.ws_url()).await?;
             let (mut write, mut read) = ws_stream.split();
 
-            write.send(Message::Text(message.to_string())).await?;
+            write.send(Message::Text(message.to_string().into())).await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             if let Some(error_obj) = response.get("error") {
                 let error_code = error_obj["code"].as_i64().unwrap();
@@ -104,7 +104,7 @@ async fn test_mcp_connection_stress() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&init_message)?))
+                .send(Message::Text(serde_json::to_string(&init_message)?.into()))
                 .await?;
             let _response = receive_ws_message(&mut read, Duration::from_secs(2)).await?;
 
@@ -122,7 +122,7 @@ async fn test_mcp_connection_stress() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&tool_message)?))
+                .send(Message::Text(serde_json::to_string(&tool_message)?.into()))
                 .await?;
             let _response = receive_ws_message(&mut read, Duration::from_secs(2)).await?;
 
@@ -169,11 +169,11 @@ async fn test_mcp_large_messages() {
             large_message.len()
         );
         write
-            .send(Message::Text(serde_json::to_string(&echo_message)?))
+            .send(Message::Text(serde_json::to_string(&echo_message)?.into()))
             .await?;
 
         let response_text = receive_ws_message(&mut read, Duration::from_secs(10)).await?;
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
 
         if response.get("error").is_some() {
             error!("❌ Large message failed: {}", response["error"]);
@@ -255,7 +255,7 @@ async fn test_mcp_concurrent_messages() {
                 serde_json::to_string(&message)?
             );
             write
-                .send(Message::Text(serde_json::to_string(&message)?))
+                .send(Message::Text(serde_json::to_string(&message)?.into()))
                 .await?;
         }
 
@@ -263,7 +263,7 @@ async fn test_mcp_concurrent_messages() {
         let mut responses = vec![];
         for _ in 0..5 {
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
             responses.push(response);
         }
 
@@ -310,7 +310,7 @@ async fn test_mcp_connection_interruption() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&init_message)?))
+                .send(Message::Text(serde_json::to_string(&init_message)?.into()))
                 .await?;
 
             // Immediately close connection

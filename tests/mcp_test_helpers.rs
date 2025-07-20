@@ -83,7 +83,7 @@ pub async fn receive_ws_message(
         .map_err(|e| format!("WebSocket error: {e}"))?;
 
     match message {
-        Message::Text(text) => Ok(text),
+        Message::Text(text) => Ok(text.to_string()),
         Message::Close(_) => Err("WebSocket connection closed".into()),
         _ => Err("Unexpected message type".into()),
     }
@@ -123,7 +123,7 @@ pub async fn initialize_mcp_connection_with_server(
     });
 
     write
-        .send(Message::Text(serde_json::to_string(&init_message)?))
+        .send(Message::Text(serde_json::to_string(&init_message)?.into()))
         .await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
@@ -242,11 +242,11 @@ mod tests {
                 });
 
                 write
-                    .send(Message::Text(serde_json::to_string(&tools_message)?))
+                    .send(Message::Text(serde_json::to_string(&tools_message)?.into()))
                     .await?;
 
                 let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-                let response: Value = serde_json::from_str(&response_text)?;
+                let response: Value = serde_json::from_str(&response_text.to_string())?;
 
                 assert_eq!(response["jsonrpc"], "2.0");
                 assert_eq!(response["id"], 2);

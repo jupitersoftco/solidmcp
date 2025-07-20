@@ -1,6 +1,6 @@
 // Session and cookie helpers for MCP HTTP
 
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{distr::Alphanumeric, Rng};
 
 #[allow(dead_code)]
 pub(crate) fn extract_session_id_from_cookie(cookie: &Option<String>) -> Option<String> {
@@ -18,7 +18,7 @@ pub(crate) fn extract_session_id_from_cookie(cookie: &Option<String>) -> Option<
 
 #[allow(dead_code)]
 pub(crate) fn generate_session_id() -> String {
-    rand::thread_rng()
+    rand::rng()
         .sample_iter(&Alphanumeric)
         .take(32)
         .map(char::from)

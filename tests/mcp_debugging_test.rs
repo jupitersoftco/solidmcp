@@ -141,7 +141,7 @@ async fn test_protocol_handshake() -> Result<(), Box<dyn std::error::Error + Sen
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&init_message)?))
+            .send(Message::Text(serde_json::to_string(&init_message)?.into()))
             .await?;
         let _init_response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
@@ -170,7 +170,7 @@ async fn test_tool_discovery() -> Result<(), Box<dyn std::error::Error + Send + 
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&tools_message)?))
+            .send(Message::Text(serde_json::to_string(&tools_message)?.into()))
             .await?;
 
         let text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
@@ -230,7 +230,7 @@ async fn test_tool_execution() -> Result<(), Box<dyn std::error::Error + Send + 
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&echo_message)?))
+            .send(Message::Text(serde_json::to_string(&echo_message)?.into()))
             .await?;
 
         let text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
@@ -268,7 +268,7 @@ async fn test_tool_execution() -> Result<(), Box<dyn std::error::Error + Send + 
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&read_message)?))
+            .send(Message::Text(serde_json::to_string(&read_message)?.into()))
             .await?;
 
         let text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
@@ -319,7 +319,9 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error + Send + 
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&unknown_message)?))
+            .send(Message::Text(
+                serde_json::to_string(&unknown_message)?.into(),
+            ))
             .await?;
 
         let text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
@@ -352,7 +354,7 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error + Send + 
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&unknown_tool_message)?))
+            .send(Message::Text(serde_json::to_string(&unknown_tool_message)?.into()))
             .await?;
 
         let text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
@@ -399,7 +401,7 @@ async fn test_performance() -> Result<(), Box<dyn std::error::Error + Send + Syn
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&init_message)?))
+                .send(Message::Text(serde_json::to_string(&init_message)?.into()))
                 .await?;
             let _init_response = receive_ws_message(&mut read, Duration::from_secs(2)).await?;
 
@@ -417,7 +419,7 @@ async fn test_performance() -> Result<(), Box<dyn std::error::Error + Send + Syn
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&echo_message)?))
+                .send(Message::Text(serde_json::to_string(&echo_message)?.into()))
                 .await?;
             let _echo_response = receive_ws_message(&mut read, Duration::from_secs(2)).await?;
         }

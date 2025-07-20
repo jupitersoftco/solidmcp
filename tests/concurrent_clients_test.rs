@@ -325,7 +325,7 @@ async fn test_mixed_protocol_clients() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(init.to_string())).await?;
+        write.send(Message::Text(init.to_string().into())).await?;
         let _ = read.next().await;
 
         ws_barrier.wait().await;
@@ -339,10 +339,12 @@ async fn test_mixed_protocol_clients() -> Result<()> {
                 "params": {}
             });
 
-            write.send(Message::Text(request.to_string())).await?;
+            write
+                .send(Message::Text(request.to_string().into()))
+                .await?;
 
             if let Some(Ok(Message::Text(response_text))) = read.next().await {
-                let response: Value = serde_json::from_str(&response_text)?;
+                let response: Value = serde_json::from_str(&response_text.to_string())?;
                 assert!(response["result"]["tools"].is_array());
             }
         }

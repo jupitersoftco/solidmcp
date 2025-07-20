@@ -50,11 +50,13 @@ async fn test_websocket_connection_and_init() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
+    write
+        .send(Message::Text(init_request.to_string().into()))
+        .await?;
 
     // Read response
     if let Some(Ok(Message::Text(response_text))) = read.next().await {
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
         assert_eq!(response["jsonrpc"], "2.0");
         assert_eq!(response["id"], 1);
         assert!(response["result"]["capabilities"].is_object());
@@ -92,7 +94,7 @@ async fn test_websocket_message_ordering() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init.to_string())).await?;
+    write.send(Message::Text(init.to_string().into())).await?;
     let _ = read.next().await; // Consume init response
 
     // Send multiple requests rapidly
@@ -104,14 +106,16 @@ async fn test_websocket_message_ordering() -> Result<()> {
             "method": "tools/list",
             "params": {}
         });
-        write.send(Message::Text(request.to_string())).await?;
+        write
+            .send(Message::Text(request.to_string().into()))
+            .await?;
     }
 
     // Collect responses
     let mut received_ids = Vec::new();
     for _ in 0..request_ids.len() {
         if let Some(Ok(Message::Text(response_text))) = read.next().await {
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
             if let Some(id) = response["id"].as_i64() {
                 received_ids.push(id);
             }
@@ -143,7 +147,7 @@ async fn test_websocket_ping_pong() -> Result<()> {
     let (mut write, mut read) = ws_stream.split();
 
     // Send ping
-    write.send(Message::Ping(vec![1, 2, 3])).await?;
+    write.send(Message::Ping(vec![1, 2, 3].into())).await?;
 
     // Should receive pong
     tokio::time::timeout(tokio::time::Duration::from_secs(5), async {
@@ -185,7 +189,7 @@ async fn test_websocket_close_handling() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init.to_string())).await?;
+    write.send(Message::Text(init.to_string().into())).await?;
     let _ = read.next().await;
 
     // Send close
@@ -240,11 +244,13 @@ async fn test_websocket_large_messages() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(large_request.to_string())).await?;
+    write
+        .send(Message::Text(large_request.to_string().into()))
+        .await?;
 
     // Should receive response
     if let Some(Ok(Message::Text(response_text))) = read.next().await {
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
         assert_eq!(response["jsonrpc"], "2.0");
         assert!(response["result"].is_object());
     } else {
@@ -289,11 +295,11 @@ async fn test_concurrent_websocket_connections() -> Result<()> {
                 }
             });
 
-            write.send(Message::Text(init.to_string())).await?;
+            write.send(Message::Text(init.to_string().into())).await?;
 
             // Read initialization response
             if let Some(Ok(Message::Text(response_text))) = read.next().await {
-                let response: Value = serde_json::from_str(&response_text)?;
+                let response: Value = serde_json::from_str(&response_text.to_string())?;
                 assert_eq!(response["result"]["protocolVersion"], "2025-06-18");
             }
 
@@ -306,10 +312,12 @@ async fn test_concurrent_websocket_connections() -> Result<()> {
                     "params": {}
                 });
 
-                write.send(Message::Text(request.to_string())).await?;
+                write
+                    .send(Message::Text(request.to_string().into()))
+                    .await?;
 
                 if let Some(Ok(Message::Text(response_text))) = read.next().await {
-                    let response: Value = serde_json::from_str(&response_text)?;
+                    let response: Value = serde_json::from_str(&response_text.to_string())?;
                     assert!(response["result"]["tools"].is_array());
                 }
             }
@@ -355,7 +363,7 @@ async fn test_websocket_reconnection() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(init.to_string())).await?;
+        write.send(Message::Text(init.to_string().into())).await?;
         let _ = read.next().await;
 
         // Close connection
@@ -376,10 +384,10 @@ async fn test_websocket_reconnection() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(init.to_string())).await?;
+        write.send(Message::Text(init.to_string().into())).await?;
 
         if let Some(Ok(Message::Text(response_text))) = read.next().await {
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
             assert_eq!(response["result"]["protocolVersion"], "2025-06-18");
         }
     }

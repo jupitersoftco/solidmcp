@@ -34,13 +34,13 @@ async fn test_mcp_tools_list() {
                 serde_json::to_string(&list_message)?
             );
             write
-                .send(Message::Text(serde_json::to_string(&list_message)?))
+                .send(Message::Text(serde_json::to_string(&list_message)?.into()))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             debug!("📥 Received tools/list response: {}", response_text);
 
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             // Validate response structure
             assert_eq!(response["jsonrpc"], "2.0");
@@ -125,13 +125,13 @@ async fn test_mcp_tools_echo() {
                 serde_json::to_string(&echo_message)?
             );
             write
-                .send(Message::Text(serde_json::to_string(&echo_message)?))
+                .send(Message::Text(serde_json::to_string(&echo_message)?.into()))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             debug!("📥 Received echo response: {}", response_text);
 
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             // Validate response
             assert_eq!(response["jsonrpc"], "2.0");
@@ -205,13 +205,15 @@ async fn test_mcp_tools_read_file() {
                 serde_json::to_string(&read_file_message)?
             );
             write
-                .send(Message::Text(serde_json::to_string(&read_file_message)?))
+                .send(Message::Text(
+                    serde_json::to_string(&read_file_message)?.into(),
+                ))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             debug!("📥 Received read_file response: {}", response_text);
 
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             // Validate response
             assert_eq!(response["jsonrpc"], "2.0");
@@ -293,13 +295,15 @@ async fn test_mcp_tools_unknown() {
                 serde_json::to_string(&unknown_message)?
             );
             write
-                .send(Message::Text(serde_json::to_string(&unknown_message)?))
+                .send(Message::Text(
+                    serde_json::to_string(&unknown_message)?.into(),
+                ))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             debug!("📥 Received unknown tool response: {}", response_text);
 
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             // Validate response
             assert_eq!(response["jsonrpc"], "2.0");
@@ -340,11 +344,11 @@ async fn test_mcp_tools_no_init() {
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&list_message)?))
+            .send(Message::Text(serde_json::to_string(&list_message)?.into()))
             .await?;
 
         let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
 
         // Should get an error for not being initialized
         if response.get("error").is_some() {
@@ -373,12 +377,12 @@ async fn test_mcp_websocket_empty_message_parse_error() {
         let (mut write, mut read) = ws_stream.split();
 
         // Send empty message
-        write.send(Message::Text("".to_string())).await?;
+        write.send(Message::Text("".to_string().into())).await?;
 
         // Should get an error or connection close
         match receive_ws_message(&mut read, Duration::from_secs(2)).await {
             Ok(response_text) => {
-                let response: Value = serde_json::from_str(&response_text)?;
+                let response: Value = serde_json::from_str(&response_text.to_string())?;
                 if response.get("error").is_some() {
                     info!("✅ Empty message correctly rejected: {}", response["error"]);
                 } else {
@@ -417,11 +421,13 @@ async fn test_mcp_tool_argument_validation() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&invalid_echo_message)?))
+                .send(Message::Text(
+                    serde_json::to_string(&invalid_echo_message)?.into(),
+                ))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], 6);

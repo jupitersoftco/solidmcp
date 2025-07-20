@@ -39,14 +39,14 @@ async fn test_mcp_protocol_initialize() {
             serde_json::to_string(&init_message)?
         );
         write
-            .send(Message::Text(serde_json::to_string(&init_message)?))
+            .send(Message::Text(serde_json::to_string(&init_message)?.into()))
             .await?;
 
         // Receive response
         let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
         debug!("📥 Received response: {}", response_text);
 
-        let response: Value = serde_json::from_str(&response_text)?;
+        let response: Value = serde_json::from_str(&response_text.to_string())?;
 
         // Validate response structure
         assert_eq!(response["jsonrpc"], "2.0");
@@ -103,11 +103,11 @@ async fn test_mcp_protocol_version() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&init_message)?))
+                .send(Message::Text(serde_json::to_string(&init_message)?.into()))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             if response.get("error").is_some() {
                 debug!(
@@ -165,12 +165,12 @@ async fn test_mcp_protocol_malformed() {
 
             // Send malformed message and expect error response
             if let Ok(message_str) = serde_json::to_string(message) {
-                write.send(Message::Text(message_str)).await?;
+                write.send(Message::Text(message_str.into())).await?;
 
                 // Try to receive response (might timeout for completely invalid messages)
                 match receive_ws_message(&mut read, Duration::from_secs(2)).await {
                     Ok(response_text) => {
-                        let response: Value = serde_json::from_str(&response_text)?;
+                        let response: Value = serde_json::from_str(&response_text.to_string())?;
                         if response.get("error").is_some() {
                             debug!("✅ Correctly received error for malformed message {}", i);
                         } else {
@@ -225,7 +225,7 @@ async fn test_mcp_protocol_ordering() {
             // Send all requests
             for request in &requests {
                 write
-                    .send(Message::Text(serde_json::to_string(request)?))
+                    .send(Message::Text(serde_json::to_string(request)?.into()))
                     .await?;
             }
 
@@ -233,7 +233,7 @@ async fn test_mcp_protocol_ordering() {
             let mut responses = Vec::new();
             for _ in 0..requests.len() {
                 let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-                let response: Value = serde_json::from_str(&response_text)?;
+                let response: Value = serde_json::from_str(&response_text.to_string())?;
                 responses.push(response);
             }
 
@@ -273,11 +273,13 @@ async fn test_jsonrpc_compliance() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&string_id_request)?))
+                .send(Message::Text(
+                    serde_json::to_string(&string_id_request)?.into(),
+                ))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], "test-string-id");
@@ -291,11 +293,13 @@ async fn test_jsonrpc_compliance() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&null_id_request)?))
+                .send(Message::Text(
+                    serde_json::to_string(&null_id_request)?.into(),
+                ))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], serde_json::Value::Null);
@@ -308,11 +312,13 @@ async fn test_jsonrpc_compliance() {
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&no_params_request)?))
+                .send(Message::Text(
+                    serde_json::to_string(&no_params_request)?.into(),
+                ))
                 .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
-            let response: Value = serde_json::from_str(&response_text)?;
+            let response: Value = serde_json::from_str(&response_text.to_string())?;
 
             assert_eq!(response["jsonrpc"], "2.0");
             assert_eq!(response["id"], 42);
