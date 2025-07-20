@@ -39,6 +39,14 @@ impl HttpMcpHandler {
             .and(with_handler(self.protocol_engine.clone()))
             .and_then(handle_mcp_get);
 
+        // SSE endpoint - returns proper error when SSE is not implemented
+        let sse_route = warp::path!("mcp")
+            .and(warp::get())
+            .and(warp::header::optional::<String>("accept"))
+            .and(warp::header::optional::<String>("cache-control"))
+            .and(with_handler(self.protocol_engine.clone()))
+            .and_then(handle_mcp_sse_fallback);
+
         let post_route = warp::path!("mcp")
             .and(warp::post())
             .and(transport_capabilities())
@@ -57,8 +65,12 @@ impl HttpMcpHandler {
             .and(with_handler(self.protocol_engine.clone()))
             .and_then(handle_mcp_http);
 
-        // Try enhanced routes first, then fallback to legacy for backward compatibility
-        options_route.or(get_route).or(post_route).or(legacy_route)
+        // Try enhanced routes first, then SSE fallback, then legacy for backward compatibility
+        options_route
+            .or(get_route)
+            .or(sse_route)
+            .or(post_route)
+            .or(legacy_route)
     }
 }
 
@@ -457,6 +469,48 @@ async fn handle_mcp_enhanced_post(
             .into_response())
         }
     }
+}
+
+/// Enhanced handler for SSE fallback (when client requests SSE but server doesn't support it)
+async fn handle_mcp_sse_fallback(
+    accept: Option<String>,
+    _cache_control: Option<String>,
+    _handler: Arc<McpProtocolEngine>,
+) -> Result<warp::reply::Response, Rejection> {
+    info!("🌐 SSE fallback request with Accept: {:?}", accept);
+
+    // Check if this is actually an SSE request
+    if let Some(accept_header) = &accept {
+        if accept_header.contains("text/event-stream") {
+            warn!("Client requested SSE but server doesn't support it, returning helpful error");
+
+            let error_response = json!({
+                "error": {
+                    "code": -32600,
+                    "message": "Server-Sent Events (SSE) transport not implemented",
+                    "data": {
+                        "supported_transports": ["http_post", "websocket"],
+                        "instructions": "Use HTTP POST with JSON-RPC or WebSocket for real-time communication",
+                        "fallback_suggestion": "Try connecting with HTTP POST transport"
+                    }
+                }
+            });
+
+            let mut headers = cors_headers();
+            headers.insert("content-type", HeaderValue::from_static("application/json"));
+
+            let mut response =
+                reply::with_status(reply::json(&error_response), StatusCode::OK).into_response();
+            for (key, value) in headers.iter() {
+                response.headers_mut().insert(key.clone(), value.clone());
+            }
+
+            return Ok(response);
+        }
+    }
+
+    // If not an SSE request, fall through to other handlers
+    Err(warp::reject::not_found())
 }
 
 /// Extract session ID from cookie header

@@ -95,11 +95,16 @@ impl McpProtocolEngine {
 
                     // Check if already initialized
                     if protocol_handler.initialized {
-                        return self.create_error_response(
-                            message.get("id").cloned(),
-                            -32603,
-                            "Already initialized",
-                        );
+                        // For HTTP clients that may reconnect, allow re-initialization
+                        // This is especially important for MCP clients like Cursor that may
+                        // create multiple connections or reconnect frequently
+                        debug!("Session {} already initialized, allowing re-initialization for HTTP client", session_key);
+
+                        // Reset the session state to allow clean re-initialization
+                        protocol_handler.initialized = false;
+                        protocol_handler.protocol_version = None;
+
+                        debug!("Reset session {} state for re-initialization", session_key);
                     }
 
                     match custom_handler.initialize(params, &context).await {

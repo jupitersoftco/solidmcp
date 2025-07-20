@@ -311,7 +311,7 @@ mod tests {
             .unwrap();
         assert!(result["result"].is_object());
 
-        // Try to reinitialize same session (should fail)
+        // Try to reinitialize same session (should succeed with graceful re-initialization)
         let init2 = json!({
             "jsonrpc": "2.0",
             "id": 2,
@@ -325,7 +325,7 @@ mod tests {
             .handle_message(init2, Some(session_id.to_string()))
             .await
             .unwrap();
-        assert!(result["error"].is_object()); // Already initialized
+        assert!(result["result"].is_object()); // Should succeed with re-initialization
 
         // But can still use the session
         let tools = json!({
