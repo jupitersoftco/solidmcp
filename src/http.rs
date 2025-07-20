@@ -1,15 +1,19 @@
 //! MCP HTTP Handler
 //!
-//! HTTP transport for MCP protocol messages.
+//! HTTP transport for MCP protocol messages with intelligent transport negotiation.
 
 use {
     super::shared::McpProtocolEngine,
+    super::transport::{
+        cors_headers, transport_capabilities, TransportCapabilities, TransportInfo,
+        TransportNegotiation,
+    },
     super::validation::McpValidator,
     anyhow::Result,
     serde_json::{json, Value},
     std::sync::Arc,
     tracing::{debug, error, info, warn},
-    warp::http::StatusCode,
+    warp::http::{HeaderValue, StatusCode},
     warp::{reply, Filter, Rejection, Reply},
 };
 
@@ -23,7 +27,27 @@ impl HttpMcpHandler {
     }
 
     pub fn route(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-        warp::path!("mcp")
+        let options_route = warp::path!("mcp")
+            .and(warp::options())
+            .and(transport_capabilities())
+            .and(with_handler(self.protocol_engine.clone()))
+            .and_then(handle_mcp_options);
+
+        let get_route = warp::path!("mcp")
+            .and(warp::get())
+            .and(transport_capabilities())
+            .and(with_handler(self.protocol_engine.clone()))
+            .and_then(handle_mcp_get);
+
+        let post_route = warp::path!("mcp")
+            .and(warp::post())
+            .and(transport_capabilities())
+            .and(warp::body::json())
+            .and(warp::header::optional::<String>("cookie"))
+            .and(with_handler(self.protocol_engine.clone()))
+            .and_then(handle_mcp_enhanced_post);
+
+        let legacy_route = warp::path!("mcp")
             .and(warp::post())
             .and(warp::body::json())
             .and(warp::header::optional::<String>("content-type"))
@@ -31,7 +55,10 @@ impl HttpMcpHandler {
             .and(warp::header::optional::<String>("connection"))
             .and(warp::header::optional::<String>("cookie"))
             .and(with_handler(self.protocol_engine.clone()))
-            .and_then(handle_mcp_http)
+            .and_then(handle_mcp_http);
+
+        // Try enhanced routes first, then fallback to legacy for backward compatibility
+        options_route.or(get_route).or(post_route).or(legacy_route)
     }
 }
 
@@ -250,6 +277,184 @@ async fn handle_mcp_http(
             });
             debug!("📤 Sending error response: {:?}", error_response);
             Ok(create_error_reply(error_response, StatusCode::OK))
+        }
+    }
+}
+
+/// Enhanced handler for OPTIONS requests (CORS and capability discovery)
+async fn handle_mcp_options(
+    capabilities: TransportCapabilities,
+    _handler: Arc<McpProtocolEngine>,
+) -> Result<warp::reply::Response, Rejection> {
+    info!("🌐 OPTIONS request with capabilities: {:?}", capabilities);
+
+    let info = TransportInfo::new(&capabilities, "SolidMCP", "0.1.0", "/mcp");
+    let response = info.to_json();
+
+    let mut headers = cors_headers();
+    headers.insert("content-type", HeaderValue::from_static("application/json"));
+
+    let mut response = reply::with_status(reply::json(&response), StatusCode::OK).into_response();
+    for (key, value) in headers.iter() {
+        response.headers_mut().insert(key.clone(), value.clone());
+    }
+
+    Ok(response)
+}
+
+/// Enhanced handler for GET requests (transport discovery and WebSocket upgrade)
+async fn handle_mcp_get(
+    capabilities: TransportCapabilities,
+    _handler: Arc<McpProtocolEngine>,
+) -> Result<warp::reply::Response, Rejection> {
+    info!("🌐 GET request with capabilities: {:?}", capabilities);
+
+    let negotiation =
+        TransportNegotiation::negotiate("GET", &capabilities, false, "SolidMCP", "0.1.0", "/mcp");
+
+    match negotiation {
+        TransportNegotiation::WebSocketUpgrade => {
+            // This should be handled by WebSocket filters, not here
+            warn!("WebSocket upgrade requested but not handled by WS filter");
+            let error_response = json!({
+                "error": {
+                    "code": -32600,
+                    "message": "WebSocket upgrade not available in this handler",
+                    "data": {
+                        "supported_transports": ["http_post"],
+                        "instructions": "Use WebSocket endpoint for WebSocket connections"
+                    }
+                }
+            });
+            Ok(
+                reply::with_status(reply::json(&error_response), StatusCode::BAD_REQUEST)
+                    .into_response(),
+            )
+        }
+        TransportNegotiation::InfoResponse(info) => {
+            let response = info.to_json();
+            let mut headers = cors_headers();
+            headers.insert("content-type", HeaderValue::from_static("application/json"));
+
+            let mut resp =
+                reply::with_status(reply::json(&response), StatusCode::OK).into_response();
+            for (key, value) in headers.iter() {
+                resp.headers_mut().insert(key.clone(), value.clone());
+            }
+
+            Ok(resp)
+        }
+        TransportNegotiation::UnsupportedTransport { error, supported } => {
+            let error_response = json!({
+                "error": {
+                    "code": -32600,
+                    "message": error,
+                    "data": {
+                        "supported_transports": supported,
+                        "client_capabilities": capabilities
+                    }
+                }
+            });
+            Ok(
+                reply::with_status(reply::json(&error_response), StatusCode::BAD_REQUEST)
+                    .into_response(),
+            )
+        }
+        _ => {
+            let error_response = json!({
+                "error": {
+                    "code": -32600,
+                    "message": "Unexpected negotiation result for GET request"
+                }
+            });
+            Ok(reply::with_status(
+                reply::json(&error_response),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
+            .into_response())
+        }
+    }
+}
+
+/// Enhanced handler for POST requests with transport capability detection
+async fn handle_mcp_enhanced_post(
+    capabilities: TransportCapabilities,
+    message: Value,
+    cookie: Option<String>,
+    handler: Arc<McpProtocolEngine>,
+) -> Result<warp::reply::Response, Rejection> {
+    info!(
+        "🌐 Enhanced POST request with capabilities: {:?}",
+        capabilities
+    );
+
+    let negotiation =
+        TransportNegotiation::negotiate("POST", &capabilities, true, "SolidMCP", "0.1.0", "/mcp");
+
+    match negotiation {
+        TransportNegotiation::HttpJsonRpc => {
+            // Use the existing HTTP handler logic but with enhanced logging
+            info!(
+                "📡 Using HTTP JSON-RPC transport (preferred: {})",
+                capabilities.preferred_transport()
+            );
+
+            // Log client information
+            if let Some(client_info) = &capabilities.client_info {
+                info!("🔍 Client: {}", client_info);
+            }
+            if let Some(protocol_version) = &capabilities.protocol_version {
+                info!("🔍 Requested protocol version: {}", protocol_version);
+            }
+
+            // Call the existing handler with converted parameters
+            match handle_mcp_http(
+                message,
+                Some("application/json".to_string()),
+                Some("application/json".to_string()),
+                Some("close".to_string()),
+                cookie,
+                handler,
+            )
+            .await
+            {
+                Ok(reply) => Ok(reply.into_response()),
+                Err(e) => Err(e),
+            }
+        }
+        TransportNegotiation::UnsupportedTransport { error, supported } => {
+            warn!("🚫 Unsupported transport: {}", error);
+            let error_response = json!({
+                "jsonrpc": "2.0",
+                "id": message.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": error,
+                    "data": {
+                        "supported_transports": supported,
+                        "client_capabilities": capabilities
+                    }
+                }
+            });
+            Ok(
+                reply::with_status(reply::json(&error_response), StatusCode::BAD_REQUEST)
+                    .into_response(),
+            )
+        }
+        _ => {
+            let error_response = json!({
+                "jsonrpc": "2.0",
+                "id": message.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Unexpected negotiation result for POST request"
+                }
+            });
+            Ok(reply::with_status(
+                reply::json(&error_response),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
+            .into_response())
         }
     }
 }

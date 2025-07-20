@@ -17,6 +17,7 @@ pub mod protocol_impl;
 // Legacy server module removed - use framework module instead
 pub mod shared;
 pub mod tools;
+pub mod transport;
 pub mod validation;
 pub mod websocket;
 

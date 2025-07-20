@@ -60,7 +60,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_method_not_allowed() {
+    async fn test_get_transport_discovery() {
         let connection_id = McpConnectionId::new();
         let _logger = McpDebugLogger::new(connection_id);
         let shared_handler = Arc::new(McpProtocolEngine::new());
@@ -69,6 +69,13 @@ mod tests {
 
         let resp = request().method("GET").path("/mcp").reply(&routes).await;
 
-        assert_eq!(resp.status(), 405); // Method Not Allowed
+        assert_eq!(resp.status(), 200); // Now supports transport discovery
+
+        // Check that the response contains transport information
+        let body: serde_json::Value = serde_json::from_slice(resp.body()).unwrap();
+        assert!(body["mcp_server"].is_object());
+        assert!(body["mcp_server"]["available_transports"].is_object());
+        assert!(body["mcp_server"]["available_transports"]["websocket"].is_object());
+        assert!(body["mcp_server"]["available_transports"]["http"].is_object());
     }
 }
