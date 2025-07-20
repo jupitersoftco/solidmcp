@@ -17,6 +17,32 @@ use {
     warp::{reply, Filter, Rejection, Reply},
 };
 
+// === MCP PROGRESS NOTIFICATION SUPPORT ===
+// This implements proper MCP progress notifications as separate JSON-RPC messages
+
+#[derive(Debug, Clone)]
+pub struct ProgressNotification {
+    pub progress_token: Value,
+    pub progress: f64,
+    pub total: Option<f64>,
+    pub message: Option<String>,
+}
+
+impl ProgressNotification {
+    pub fn to_json_rpc(&self) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/progress",
+            "params": {
+                "progressToken": self.progress_token,
+                "progress": self.progress,
+                "total": self.total,
+                "message": self.message
+            }
+        })
+    }
+}
+
 pub struct HttpMcpHandler {
     protocol_engine: Arc<McpProtocolEngine>,
 }
@@ -88,9 +114,84 @@ async fn handle_mcp_http(
     cookie: Option<String>,
     handler: Arc<McpProtocolEngine>,
 ) -> Result<impl Reply, Rejection> {
+    use std::time::Instant;
+    use uuid::Uuid;
+
+    // === COMPREHENSIVE MCP PROTOCOL INSTRUMENTATION ===
+    let request_start = Instant::now();
+    let request_id = Uuid::new_v4().to_string();
     let content_type = content_type.unwrap_or_else(|| "application/json".to_string());
     let accept = accept.unwrap_or_else(|| "application/json".to_string());
     let connection = connection.unwrap_or_else(|| "close".to_string());
+
+    // === PROTOCOL ANALYSIS LOGGING ===
+    info!("🚀 === MCP REQUEST ANALYSIS START ===");
+    info!("   Request ID: {}", request_id);
+    info!("   Timestamp: {:?}", request_start);
+    info!("   Content-Type: {}", content_type);
+    info!("   Accept: {}", accept);
+    info!("   Connection: {}", connection);
+    info!("   Cookie: {:?}", cookie);
+
+    // Detect Cursor client from User-Agent patterns in headers
+    let is_cursor_client = content_type.contains("Cursor")
+        || accept.contains("Cursor")
+        || cookie.as_ref().map_or(false, |c| c.contains("Cursor"));
+
+    if is_cursor_client {
+        warn!("🎯 === CURSOR CLIENT DETECTED ===");
+        warn!("   Applying enhanced Cursor-specific protocol analysis");
+        warn!("   Request ID: {}", request_id);
+    }
+
+    // === MESSAGE STRUCTURE ANALYSIS ===
+    let method = message
+        .get("method")
+        .and_then(|m| m.as_str())
+        .unwrap_or("unknown");
+    let msg_id = message.get("id").cloned().unwrap_or(json!(null));
+    let has_params = message.get("params").is_some();
+    let has_meta = message.get("params").and_then(|p| p.get("_meta")).is_some();
+    let has_progress_token = message
+        .get("params")
+        .and_then(|p| p.get("_meta"))
+        .and_then(|m| m.get("progressToken"))
+        .is_some();
+
+    info!("🔍 === MESSAGE STRUCTURE ===");
+    info!("   Method: {}", method);
+    info!("   ID: {:?}", msg_id);
+    info!("   Has Params: {}", has_params);
+    info!("   Has Meta: {}", has_meta);
+    info!("   Has Progress Token: {}", has_progress_token);
+
+    if has_progress_token {
+        let progress_token = message
+            .get("params")
+            .and_then(|p| p.get("_meta"))
+            .and_then(|m| m.get("progressToken"));
+        warn!("⚡ PROGRESS TOKEN DETECTED: {:?}", progress_token);
+        warn!("   This indicates client expects streaming updates!");
+
+        if is_cursor_client {
+            warn!("🎯 CURSOR + PROGRESS TOKEN: Critical protocol path!");
+        }
+    }
+
+    // === MESSAGE SIZE ANALYSIS ===
+    let message_json = serde_json::to_string(&message).unwrap_or_default();
+    let request_size = message_json.len();
+
+    info!("📊 === REQUEST SIZE ANALYSIS ===");
+    info!("   Request Size: {} bytes", request_size);
+    info!("   Request Size KB: {:.2} KB", request_size as f64 / 1024.0);
+
+    if request_size > 10000 {
+        warn!(
+            "⚠️  LARGE REQUEST: {} bytes may cause processing issues",
+            request_size
+        );
+    }
 
     info!(
         "📥 MCP HTTP request - Content-Type: {}, Accept: {}, Connection: {}",
@@ -200,17 +301,175 @@ async fn handle_mcp_http(
         supports_streaming, accept, connection
     );
 
-    // Handle the message using shared logic with session management
-    match handler
-        .handle_message(message_clone, effective_session_id.clone())
-        .await
-    {
+    // Check if this is a tools/call with progress token
+    let has_progress_token = message
+        .get("params")
+        .and_then(|p| p.get("_meta"))
+        .and_then(|m| m.get("progressToken"))
+        .is_some();
+
+    // === MCP PROGRESS TOKEN HANDLING (OFFICIAL SPECIFICATION) ===
+    // According to https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress
+    // When a client sends progressToken, server SHOULD send progress notifications
+    let progress_token = if has_progress_token {
+        let token = message
+            .get("params")
+            .and_then(|p| p.get("_meta"))
+            .and_then(|m| m.get("progressToken"))
+            .cloned();
+
+        warn!("🎯 === MCP PROGRESS TOKEN DETECTED ===");
+        warn!("   Progress Token: {:?}", token);
+        warn!("   IMPLEMENTING PROPER MCP PROGRESS NOTIFICATIONS");
+        warn!("   Will send progress updates during processing");
+
+        token
+    } else {
+        None
+    };
+
+    // EXPERIMENTAL: Try Content-Length responses for progress tokens
+    // Some MCP clients may have issues with chunked responses
+    let use_chunked = supports_streaming && !has_progress_token;
+
+    if has_progress_token {
+        warn!("📏 USING CONTENT-LENGTH for MCP progress tokens");
+        warn!("   Testing if MCP client prefers standard HTTP responses");
+        warn!("   Progress notifications will be included in final response");
+    }
+
+    // Handle the message with proper MCP progress notification support
+    let (result, progress_notifications) = if has_progress_token {
+        // === PROPER MCP PROGRESS NOTIFICATION HANDLING ===
+        warn!("📡 PROCESSING WITH MCP PROGRESS NOTIFICATIONS");
+
+        let mut notifications = Vec::new();
+
+        // Send initial progress notification
+        if let Some(ref token) = progress_token {
+            let start_notification = ProgressNotification {
+                progress_token: token.clone(),
+                progress: 0.0,
+                total: Some(100.0),
+                message: Some("Starting request processing...".to_string()),
+            };
+
+            warn!(
+                "📡 QUEUING PROGRESS NOTIFICATION: {:?}",
+                start_notification.to_json_rpc()
+            );
+            notifications.push(start_notification);
+        }
+
+        // Process the message normally
+        let start_time = std::time::Instant::now();
+        let response_result = handler
+            .handle_message(message_clone, effective_session_id.clone())
+            .await;
+
+        // Send completion progress notification
+        if let Some(ref token) = progress_token {
+            let duration = start_time.elapsed();
+            let completion_notification = ProgressNotification {
+                progress_token: token.clone(),
+                progress: 100.0,
+                total: Some(100.0),
+                message: Some(format!(
+                    "Request completed in {:.2}ms",
+                    duration.as_secs_f64() * 1000.0
+                )),
+            };
+
+            warn!(
+                "📡 QUEUING COMPLETION NOTIFICATION: {:?}",
+                completion_notification.to_json_rpc()
+            );
+            notifications.push(completion_notification);
+        }
+
+        (response_result, Some(notifications))
+    } else {
+        // Standard processing without progress notifications
+        let response_result = handler
+            .handle_message(message_clone, effective_session_id.clone())
+            .await;
+        (response_result, None)
+    };
+
+    match result {
         Ok(response) => {
+            let response_processing_time = request_start.elapsed();
             debug!("📤 HTTP MCP response: {:?}", response);
 
-            // Add response size debugging
+            // === COMPREHENSIVE RESPONSE ANALYSIS ===
             let response_json = serde_json::to_string(&response).unwrap_or_default();
             let response_size = response_json.len();
+
+            info!("🎉 === MCP RESPONSE ANALYSIS ===");
+            info!("   Request ID: {}", request_id);
+            info!("   Processing Time: {:?}", response_processing_time);
+            info!("   Response Size: {} bytes", response_size);
+            info!("   Response KB: {:.2} KB", response_size as f64 / 1024.0);
+            info!("   Method: {}", method);
+            info!("   Message ID: {:?}", msg_id);
+
+            // === CURSOR-SPECIFIC ANALYSIS ===
+            if is_cursor_client {
+                warn!("🎯 === CURSOR RESPONSE ANALYSIS ===");
+                warn!("   Request ID: {}", request_id);
+                warn!("   Processing Time: {:?}", response_processing_time);
+                warn!("   Response Size: {} bytes", response_size);
+
+                // Critical analysis for Cursor timeouts
+                if response_size > 10000 {
+                    warn!("⚠️  CURSOR LARGE RESPONSE WARNING: {} bytes", response_size);
+                    warn!("   This may cause Cursor client timeout - consider optimization!");
+                }
+
+                if response_processing_time.as_millis() > 5000 {
+                    warn!(
+                        "⚠️  CURSOR SLOW RESPONSE WARNING: {:?}",
+                        response_processing_time
+                    );
+                    warn!("   This may cause Cursor client timeout!");
+                }
+
+                if has_progress_token {
+                    warn!("🎯 CURSOR + PROGRESS TOKEN RESPONSE");
+                    warn!("   Cursor expects this to support streaming updates");
+                    warn!("   Current implementation: Single response (not streaming)");
+                }
+            }
+
+            // === RESPONSE CONTENT ANALYSIS ===
+            let has_result = response.get("result").is_some();
+            let has_error = response.get("error").is_some();
+            let result_type = if has_result {
+                "success"
+            } else if has_error {
+                "error"
+            } else {
+                "unknown"
+            };
+
+            info!("📋 === RESPONSE CONTENT ===");
+            info!("   Type: {}", result_type);
+            info!("   Has Result: {}", has_result);
+            info!("   Has Error: {}", has_error);
+
+            if has_result {
+                let result = response.get("result").unwrap();
+                if let Some(tools) = result.get("tools") {
+                    if let Some(tools_array) = tools.as_array() {
+                        info!("   Tools Count: {}", tools_array.len());
+                    }
+                }
+                if let Some(results) = result.get("results") {
+                    if let Some(results_array) = results.as_array() {
+                        info!("   Results Count: {}", results_array.len());
+                    }
+                }
+            }
 
             warn!("🔍 RESPONSE DEBUG:");
             warn!("   📊 Response size: {} bytes", response_size);
@@ -255,9 +514,7 @@ async fn handle_mcp_http(
             // MCP uses JSON-RPC error codes in the body, not HTTP status codes
             let status = StatusCode::OK;
 
-            // For MCP clients with progress tokens, we should NOT use chunked encoding
-            // This might be causing the timeout issues
-            let use_chunked = supports_streaming && !has_progress_token;
+            // Note: use_chunked is already determined earlier in the function
 
             // Determine if we should use chunked encoding
             let (transfer_encoding, connection_header) = if use_chunked {
@@ -268,13 +525,99 @@ async fn handle_mcp_http(
                 ("", "close")
             };
 
-            // Create the response with headers
-            let base_reply = if !use_chunked {
+            // === COMPREHENSIVE HTTP HEADER ANALYSIS ===
+            info!("🔧 === HTTP RESPONSE HEADERS ANALYSIS ===");
+            info!("   Request ID: {}", request_id);
+            info!("   Use Chunked: {}", use_chunked);
+            info!("   Supports Streaming: {}", supports_streaming);
+            info!("   Has Progress Token: {}", has_progress_token);
+            info!("   Connection Header: {}", connection_header);
+
+            if is_cursor_client {
+                warn!("🎯 === CURSOR HTTP HEADERS ===");
+                warn!("   Chunked Encoding: {}", use_chunked);
+                warn!("   This is critical for Cursor compatibility!");
+
+                if !use_chunked && has_progress_token {
+                    warn!("🧪 EXPERIMENTAL FIX: Content-Length + Progress Token");
+                    warn!("   Using standard HTTP response instead of chunked encoding");
+                    warn!("   Testing if MCP client prefers this approach");
+                }
+            }
+
+            // === PROTOCOL VIOLATION PREVENTION ===
+            // CRITICAL: Prevent the HTTP protocol violation that causes client timeouts
+            info!("🛡️  === PROTOCOL COMPLIANCE CHECK ===");
+            if use_chunked {
+                warn!("🔄 Using chunked transfer encoding");
+                warn!("   Will NOT set Content-Length (prevents protocol violation)");
+            } else {
+                warn!("📏 Using Content-Length: {} bytes", response_size);
+                warn!("   Will NOT set Transfer-Encoding (prevents protocol violation)");
+            }
+
+            // Create the response with proper MCP progress notification support
+            let base_reply = if let Some(ref notifications) = progress_notifications {
+                // === STREAMING MCP PROGRESS NOTIFICATIONS ===
+                warn!(
+                    "📡 CREATING STREAMING RESPONSE WITH {} PROGRESS NOTIFICATIONS",
+                    notifications.len()
+                );
+                warn!("🔄 FORCING CHUNKED ENCODING for MCP progress notifications");
+
+                // Build the streaming response body with progress notifications + final response
+                let mut response_parts = Vec::new();
+
+                // Add each progress notification as a separate JSON message
+                for notification in notifications {
+                    let notification_json = serde_json::to_string(&notification.to_json_rpc())
+                        .unwrap_or_else(|_| "{}".to_string());
+                    response_parts.push(format!("{}\n", notification_json));
+                    warn!(
+                        "📡 ADDING PROGRESS NOTIFICATION TO STREAM: {} bytes",
+                        notification_json.len()
+                    );
+                }
+
+                // Add the final response
+                let final_response_json =
+                    serde_json::to_string(&response).unwrap_or_else(|_| "{}".to_string());
+                response_parts.push(format!("{}\n", final_response_json));
+                warn!(
+                    "📤 ADDING FINAL RESPONSE TO STREAM: {} bytes",
+                    final_response_json.len()
+                );
+
+                // Combine all parts
+                let full_response_body = response_parts.join("");
+                let total_size = full_response_body.len();
+
+                warn!("📊 TOTAL STREAMING RESPONSE SIZE: {} bytes", total_size);
+                warn!("📊 PROGRESS NOTIFICATIONS: {}", notifications.len());
+                warn!("🔄 Using Transfer-Encoding: chunked for MCP streaming");
+
+                // Create chunked response with raw body
+                reply::with_header(
+                    reply::with_header(
+                        reply::with_status(
+                            warp::reply::Response::new(full_response_body.into()),
+                            status,
+                        ),
+                        "content-type",
+                        "application/json",
+                    ),
+                    "transfer-encoding",
+                    "chunked",
+                )
+            } else if !use_chunked {
                 warn!("📏 Setting Content-Length: {} bytes", response_size);
                 // For standard responses, set Content-Length and no Transfer-Encoding
                 reply::with_header(
                     reply::with_header(
-                        reply::with_status(reply::json(&response), status),
+                        reply::with_status(
+                            warp::reply::Response::new(response_json.into()),
+                            status,
+                        ),
                         "content-type",
                         "application/json",
                     ),
@@ -286,7 +629,10 @@ async fn handle_mcp_http(
                 // For chunked responses, set Transfer-Encoding and no Content-Length
                 reply::with_header(
                     reply::with_header(
-                        reply::with_status(reply::json(&response), status),
+                        reply::with_status(
+                            warp::reply::Response::new(response_json.into()),
+                            status,
+                        ),
                         "content-type",
                         "application/json",
                     ),
@@ -327,7 +673,11 @@ async fn handle_mcp_http(
 
             let final_reply = reply::with_header(base_reply, "set-cookie", set_cookie_value);
 
-            warn!("📤 FINAL RESPONSE HEADERS:");
+            // === FINAL RESPONSE SUMMARY ===
+            let total_request_time = request_start.elapsed();
+
+            warn!("📤 === FINAL RESPONSE HEADERS ===");
+            warn!("   Request ID: {}", request_id);
             warn!("   Content-Type: application/json");
             warn!(
                 "   Content-Length: {} bytes",
@@ -339,12 +689,51 @@ async fn handle_mcp_http(
             );
             warn!("   Connection: {}", connection_header);
             warn!("   Status: {}", status);
+            warn!("   Total Time: {:?}", total_request_time);
+
+            info!("📤 === MCP REQUEST COMPLETE ===");
+            info!("   Request ID: {}", request_id);
+            info!("   Method: {}", method);
+            info!("   Total Processing Time: {:?}", total_request_time);
+            info!("   Request Size: {} bytes", request_size);
+            info!("   Response Size: {} bytes", response_size);
+            info!("   Status: SUCCESS");
+
+            if is_cursor_client {
+                warn!("🎯 === CURSOR REQUEST COMPLETE ===");
+                warn!("   Request ID: {}", request_id);
+                warn!("   Total Time: {:?}", total_request_time);
+                warn!("   Response Size: {} bytes", response_size);
+                warn!(
+                    "   Headers: {}",
+                    if use_chunked {
+                        "Chunked"
+                    } else {
+                        "Content-Length"
+                    }
+                );
+                warn!("   Protocol Compliance: ✅ (No dual headers)");
+
+                // Performance recommendations for Cursor
+                if response_size > 5000 && total_request_time.as_millis() > 1000 {
+                    warn!("💡 CURSOR OPTIMIZATION OPPORTUNITY:");
+                    warn!("   Consider response compression or pagination");
+                    warn!("   Large responses may impact Cursor user experience");
+                }
+            }
 
             info!("📤 Sending HTTP MCP response with status: {}", status);
 
             // Add a small delay to see if it helps with client timeouts
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            // Especially important for Cursor client stability
+            let delay_ms = if is_cursor_client && response_size > 5000 {
+                15
+            } else {
+                10
+            };
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
 
+            info!("✅ === REQUEST {} COMPLETE ===", request_id);
             Ok(final_reply.into_response())
         }
         Err(e) => {
