@@ -3,6 +3,7 @@
 //! Tests for Model Context Protocol server functionality.
 
 pub mod capability_negotiation_tests;
+pub mod dependency_integration_tests;
 pub mod error_handling_tests;
 pub mod handler_trait_tests;
 pub mod http;
@@ -12,6 +13,7 @@ pub mod protocol_parsing_tests;
 pub mod protocol_tests;
 pub mod session_management_tests;
 pub mod tools_tests;
+pub mod transport_integration_tests;
 
 #[cfg(test)]
 mod tests {
