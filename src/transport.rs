@@ -182,11 +182,44 @@ impl TransportInfo {
 
     /// Convert to JSON for responses
     pub fn to_json(&self) -> Value {
+        // Transform available_transports to match expected format
+        let mut transports = serde_json::Map::new();
+        
+        for (transport_type, endpoint) in &self.available_transports {
+            let uri = match transport_type.as_str() {
+                "websocket" => {
+                    // Convert http:// to ws:// for WebSocket URIs
+                    if endpoint.endpoint.starts_with("http://") {
+                        endpoint.endpoint.replace("http://", "ws://")
+                    } else if endpoint.endpoint.starts_with("https://") {
+                        endpoint.endpoint.replace("https://", "wss://")
+                    } else {
+                        format!("ws://{}", endpoint.endpoint.trim_start_matches('/'))
+                    }
+                },
+                _ => {
+                    // For HTTP, ensure proper protocol prefix
+                    if endpoint.endpoint.starts_with("http://") || endpoint.endpoint.starts_with("https://") {
+                        endpoint.endpoint.clone()
+                    } else {
+                        format!("http://{}", endpoint.endpoint.trim_start_matches('/'))
+                    }
+                }
+            };
+            
+            transports.insert(transport_type.clone(), json!({
+                "type": transport_type,
+                "uri": uri,
+                "method": if transport_type == "http" { "POST" } else { endpoint.method.clone() },
+                "description": endpoint.description
+            }));
+        }
+        
         json!({
             "mcp_server": {
                 "name": self.server_name,
                 "version": self.server_version,
-                "available_transports": self.available_transports,
+                "available_transports": transports,
                 "client_capabilities": self.client_capabilities,
                 "instructions": self.instructions,
                 "protocol": "JSON-RPC 2.0",
@@ -281,6 +314,10 @@ pub fn cors_headers() -> HeaderMap<HeaderValue> {
     headers.insert(
         "access-control-expose-headers",
         HeaderValue::from_static("x-mcp-protocol-version"),
+    );
+    headers.insert(
+        "access-control-max-age",
+        HeaderValue::from_static("3600"),
     );
     headers
 }
