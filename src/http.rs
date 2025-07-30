@@ -767,22 +767,19 @@ async fn handle_mcp_get(
 
     match negotiation {
         TransportNegotiation::WebSocketUpgrade => {
-            // This should be handled by WebSocket filters, not here
-            warn!("WebSocket upgrade requested but not handled by WS filter");
-            let error_response = json!({
-                "error": {
-                    "code": -32600,
-                    "message": "WebSocket upgrade not available in this handler",
-                    "data": {
-                        "supported_transports": ["http_post"],
-                        "instructions": "Use WebSocket endpoint for WebSocket connections"
-                    }
-                }
-            });
-            Ok(
-                reply::with_status(reply::json(&error_response), StatusCode::BAD_REQUEST)
-                    .into_response(),
-            )
+            // Return transport info instead of error for WebSocket requests
+            // This allows clients to discover available transports even when sending WS headers
+            info!("WebSocket headers detected, returning transport discovery info");
+            let info = TransportInfo::new(&capabilities, "SolidMCP", "0.1.0", "/mcp");
+            let response = info.to_json();
+            let mut headers = cors_headers();
+            headers.insert("content-type", HeaderValue::from_static("application/json"));
+            let mut resp =
+                reply::with_status(reply::json(&response), StatusCode::OK).into_response();
+            for (key, value) in headers.iter() {
+                resp.headers_mut().insert(key.clone(), value.clone());
+            }
+            Ok(resp)
         }
         TransportNegotiation::InfoResponse(info) => {
             let response = info.to_json();
@@ -871,7 +868,15 @@ async fn handle_mcp_enhanced_post(
             )
             .await
             {
-                Ok(reply) => Ok(reply.into_response()),
+                Ok(reply) => {
+                    // Add CORS headers to the response
+                    let mut response = reply.into_response();
+                    let cors = cors_headers();
+                    for (key, value) in cors.iter() {
+                        response.headers_mut().insert(key.clone(), value.clone());
+                    }
+                    Ok(response)
+                },
                 Err(e) => Err(e),
             }
         }

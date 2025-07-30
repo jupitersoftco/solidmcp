@@ -4,6 +4,7 @@
 
 pub mod capability_negotiation_tests;
 pub mod dependency_integration_tests;
+pub mod edge_case_tests;
 pub mod error_handling_tests;
 pub mod handler_trait_tests;
 pub mod http;

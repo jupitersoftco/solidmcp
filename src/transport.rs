@@ -193,16 +193,22 @@ impl TransportInfo {
                         endpoint.endpoint.replace("http://", "ws://")
                     } else if endpoint.endpoint.starts_with("https://") {
                         endpoint.endpoint.replace("https://", "wss://")
+                    } else if endpoint.endpoint.starts_with("/") {
+                        // Path only, add host
+                        format!("ws://unknown{}", endpoint.endpoint)
                     } else {
-                        format!("ws://{}", endpoint.endpoint.trim_start_matches('/'))
+                        format!("ws://{}", endpoint.endpoint)
                     }
                 },
                 _ => {
                     // For HTTP, ensure proper protocol prefix
                     if endpoint.endpoint.starts_with("http://") || endpoint.endpoint.starts_with("https://") {
                         endpoint.endpoint.clone()
+                    } else if endpoint.endpoint.starts_with("/") {
+                        // Path only, add host
+                        format!("http://unknown{}", endpoint.endpoint)
                     } else {
-                        format!("http://{}", endpoint.endpoint.trim_start_matches('/'))
+                        format!("http://{}", endpoint.endpoint)
                     }
                 }
             };
@@ -210,7 +216,7 @@ impl TransportInfo {
             transports.insert(transport_type.clone(), json!({
                 "type": transport_type,
                 "uri": uri,
-                "method": if transport_type == "http" { "POST" } else { endpoint.method.clone() },
+                "method": if transport_type == "http" { "POST" } else { &endpoint.method },
                 "description": endpoint.description
             }));
         }

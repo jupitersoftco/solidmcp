@@ -149,7 +149,7 @@ mod tests {
         assert!(result.get("error").is_some());
     }
 
-    /// Test handling of initialization errors
+    /// Test handling of initialization - now allows re-initialization
     #[tokio::test]
     async fn test_initialization_errors() {
         let mut handler = McpProtocolHandlerImpl::new();
@@ -168,7 +168,7 @@ mod tests {
         let result1 = handler.handle_message(init.clone()).await.unwrap();
         assert!(result1.get("result").is_some());
 
-        // Second initialization should fail
+        // Second initialization should also succeed (re-initialization is now allowed)
         let init2 = json!({
             "jsonrpc": "2.0",
             "id": 2,
@@ -179,9 +179,22 @@ mod tests {
         });
 
         let result2 = handler.handle_message(init2).await.unwrap();
-        assert!(result2.get("error").is_some());
-        let error_message = result2["error"]["message"].as_str().unwrap();
-        assert!(error_message.to_lowercase().contains("already initialized"));
+        assert!(result2.get("result").is_some()); // Now expects success
+        
+        // Test with invalid protocol version
+        let init_invalid = json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "invalid-version"
+            }
+        });
+        
+        let result3 = handler.handle_message(init_invalid).await.unwrap();
+        assert!(result3.get("error").is_some());
+        let error_message = result3["error"]["message"].as_str().unwrap();
+        assert!(error_message.to_lowercase().contains("unsupported protocol"));
     }
 
     /// Test error recovery and state consistency

@@ -2,8 +2,7 @@
 //!
 //! Comprehensive tests for transport detection edge cases following TDD principles
 
-use std::time::Duration;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONNECTION, UPGRADE, USER_AGENT, CONTENT_TYPE};
+use reqwest::header::{ACCEPT, CONNECTION, UPGRADE, USER_AGENT, CONTENT_TYPE};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::with_mcp_test_server;
@@ -134,13 +133,14 @@ async fn test_malformed_upgrade_headers() {
 async fn test_user_agent_edge_cases() {
     // Test various user agent strings and their impact on transport detection
     with_mcp_test_server("user_agent_test", |server| async move {
+        let long_agent = "a".repeat(1000);
         let test_cases = vec![
             ("", "Empty user agent"),
             ("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "Bot user agent"),
             ("curl/7.68.0", "cURL"),
             ("Python/3.9 aiohttp/3.8.1", "Python client"),
             ("🚀 Unicode Client 1.0 🔥", "Unicode in user agent"),
-            ("a".repeat(1000).as_str(), "Very long user agent"),
+            (long_agent.as_str(), "Very long user agent"),
             ("Client\0With\0Nulls", "Null bytes in user agent"),
         ];
 
