@@ -46,7 +46,9 @@ async fn test_mcp_error_codes() {
             let (ws_stream, _) = tokio_tungstenite::connect_async(&server.ws_url()).await?;
             let (mut write, mut read) = ws_stream.split();
 
-            write.send(Message::Text(message.to_string().into())).await?;
+            write
+                .send(Message::Text(message.to_string().into()))
+                .await?;
 
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             let response: Value = serde_json::from_str(&response_text.to_string())?;

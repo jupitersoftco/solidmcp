@@ -235,7 +235,7 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
         }
     }
 
-    async fn list_resources(&self, context: &McpContext) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: &McpContext) -> Result<Vec<ResourceInfo>> {
         let mut all_resources = Vec::new();
         for provider in &self.registry.resources {
             let mut resources = provider.list_resources(self.context.clone()).await?;
@@ -244,7 +244,7 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
         Ok(all_resources)
     }
 
-    async fn read_resource(&self, uri: &str, context: &McpContext) -> Result<ResourceContent> {
+    async fn read_resource(&self, uri: &str, _context: &McpContext) -> Result<ResourceContent> {
         for provider in &self.registry.resources {
             if let Ok(content) = provider.read_resource(uri, self.context.clone()).await {
                 return Ok(content);
@@ -253,7 +253,7 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
         Err(anyhow::anyhow!("Resource not found: {}", uri))
     }
 
-    async fn list_prompts(&self, context: &McpContext) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, _context: &McpContext) -> Result<Vec<PromptInfo>> {
         let mut all_prompts = Vec::new();
         for provider in &self.registry.prompts {
             let mut prompts = provider.list_prompts(self.context.clone()).await?;
@@ -266,7 +266,7 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
         &self,
         name: &str,
         arguments: Option<Value>,
-        context: &McpContext,
+        _context: &McpContext,
     ) -> Result<PromptContent> {
         for provider in &self.registry.prompts {
             if let Ok(content) = provider

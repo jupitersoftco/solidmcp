@@ -57,7 +57,7 @@ impl McpTestServer {
 
     /// Get the HTTP URL for this server
     pub fn http_url(&self) -> String {
-        format!("http://127.0.0.1:{}", self.port)
+        format!("http://127.0.0.1:{}/mcp", self.port)
     }
 
     /// Stop the server

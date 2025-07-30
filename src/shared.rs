@@ -100,11 +100,13 @@ impl McpProtocolEngine {
                         // create multiple connections or reconnect frequently
                         debug!("Session {} already initialized, allowing re-initialization for HTTP client", session_key);
 
-                        // Reset the session state to allow clean re-initialization
-                        protocol_handler.initialized = false;
-                        protocol_handler.protocol_version = None;
+                        // Create a fresh protocol handler to ensure clean state
+                        *protocol_handler = McpProtocolHandlerImpl::new();
 
-                        debug!("Reset session {} state for re-initialization", session_key);
+                        debug!(
+                            "Created fresh protocol handler for session {} re-initialization",
+                            session_key
+                        );
                     }
 
                     match custom_handler.initialize(params, &context).await {
@@ -334,7 +336,7 @@ impl McpProtocolEngine {
     }
 
     /// Create an error response following JSON-RPC 2.0 format
-    fn create_error_response(&self, id: Option<Value>, code: i32, message: &str) -> Result<Value> {
+    fn _create_error_response(&self, id: Option<Value>, code: i32, message: &str) -> Result<Value> {
         Ok(json!({
             "jsonrpc": "2.0",
             "id": id.unwrap_or(Value::Null),

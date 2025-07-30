@@ -173,7 +173,9 @@ async fn test_mcp_unknown_tool_error() -> Result<(), Box<dyn std::error::Error +
             });
 
             write
-                .send(Message::Text(serde_json::to_string(&unknown_message)?.into()))
+                .send(Message::Text(
+                    serde_json::to_string(&unknown_message)?.into(),
+                ))
                 .await?;
             let unknown_response_text =
                 receive_ws_message(&mut read, Duration::from_secs(2)).await?;

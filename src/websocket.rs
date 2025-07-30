@@ -85,7 +85,13 @@ async fn handle_mcp_ws(
                                 .await
                             {
                                 Ok(response) => {
-                                    let response_text = serde_json::to_string(&response).unwrap();
+                                    let response_text = match serde_json::to_string(&response) {
+                                        Ok(text) => text,
+                                        Err(e) => {
+                                            error!("Failed to serialize response: {}", e);
+                                            continue;
+                                        }
+                                    };
                                     debug!("📤 Raw MCP Response: {}", response_text);
 
                                     if let Err(e) =
@@ -121,8 +127,13 @@ async fn handle_mcp_ws(
                                         }
                                     });
 
-                                    let error_text =
-                                        serde_json::to_string(&error_response).unwrap();
+                                    let error_text = match serde_json::to_string(&error_response) {
+                                        Ok(text) => text,
+                                        Err(e) => {
+                                            error!("Failed to serialize error response: {}", e);
+                                            break;
+                                        }
+                                    };
                                     if let Err(e) = ws_sender.send(Message::text(error_text)).await
                                     {
                                         error!("{}", logger.fmt_response_error(&e.to_string()));
@@ -143,7 +154,13 @@ async fn handle_mcp_ws(
                                 }
                             });
 
-                            let error_text = serde_json::to_string(&error_response).unwrap();
+                            let error_text = match serde_json::to_string(&error_response) {
+                                Ok(text) => text,
+                                Err(e) => {
+                                    error!("Failed to serialize parse error response: {}", e);
+                                    break;
+                                }
+                            };
                             if let Err(e) = ws_sender.send(Message::text(error_text)).await {
                                 error!("{}", logger.fmt_response_error(&e.to_string()));
                                 break;

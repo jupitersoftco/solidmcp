@@ -354,7 +354,9 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error + Send + 
         });
 
         write
-            .send(Message::Text(serde_json::to_string(&unknown_tool_message)?.into()))
+            .send(Message::Text(
+                serde_json::to_string(&unknown_tool_message)?.into(),
+            ))
             .await?;
 
         let text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;

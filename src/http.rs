@@ -291,24 +291,32 @@ async fn handle_mcp_http(
     debug!("🍪 Session ID from cookie: {:?}", session_id);
     debug!("🍪 Effective session ID: {:?}", effective_session_id);
 
-    // === STRATEGY 1: IMMEDIATE PROGRESS WITH CHUNKED ENCODING (DEFAULT) ===
-    // Based on successful testing, this is the optimal approach for MCP clients
-    // Always use chunked encoding and immediate progress notifications
-    let use_chunked = true;
-
-    info!("🔧 Strategy 1: Immediate progress with chunked encoding (DEFAULT)");
-    info!(
-        "   Using Chunked Encoding: {} (Accept: {}, Connection: {})",
-        use_chunked, accept, connection
-    );
-    info!("📡 HTTP/1.1 Chunked encoding enabled for MCP compliance");
-
     // Check if this is a tools/call with progress token
     let has_progress_token = message
         .get("params")
         .and_then(|p| p.get("_meta"))
         .and_then(|m| m.get("progressToken"))
         .is_some();
+
+    // === HTTP ENCODING STRATEGY ===
+    // Use chunked encoding ONLY when we have progress tokens
+    // This prevents HTTP protocol violations and ensures compatibility
+    let use_chunked = has_progress_token;
+
+    info!("🔧 HTTP encoding strategy:");
+    info!(
+        "   Has Progress Token: {} (Accept: {}, Connection: {})",
+        has_progress_token, accept, connection
+    );
+    info!(
+        "   Using Chunked Encoding: {} ({})",
+        use_chunked,
+        if use_chunked {
+            "for streaming progress"
+        } else {
+            "standard Content-Length"
+        }
+    );
 
     // === STRATEGY 1: MCP PROGRESS TOKEN HANDLING (OPTIMAL APPROACH) ===
     // Based on successful testing, always implement immediate progress notifications
@@ -337,7 +345,7 @@ async fn handle_mcp_http(
     }
 
     // Handle the message with Strategy 1: Immediate progress with chunked encoding
-    let (result, progress_notifications) = if has_progress_token {
+    let (result, _progress_notifications) = if has_progress_token {
         // === STRATEGY 1: IMMEDIATE PROGRESS NOTIFICATION HANDLING ===
         warn!("📡 STRATEGY 1: PROCESSING WITH IMMEDIATE PROGRESS NOTIFICATIONS");
 
@@ -456,15 +464,16 @@ async fn handle_mcp_http(
             info!("   Has Error: {}", has_error);
 
             if has_result {
-                let result = response.get("result").unwrap();
-                if let Some(tools) = result.get("tools") {
-                    if let Some(tools_array) = tools.as_array() {
-                        info!("   Tools Count: {}", tools_array.len());
+                if let Some(result) = response.get("result") {
+                    if let Some(tools) = result.get("tools") {
+                        if let Some(tools_array) = tools.as_array() {
+                            info!("   Tools Count: {}", tools_array.len());
+                        }
                     }
-                }
-                if let Some(results) = result.get("results") {
-                    if let Some(results_array) = results.as_array() {
-                        info!("   Results Count: {}", results_array.len());
+                    if let Some(results) = result.get("results") {
+                        if let Some(results_array) = results.as_array() {
+                            info!("   Results Count: {}", results_array.len());
+                        }
                     }
                 }
             }
@@ -514,13 +523,13 @@ async fn handle_mcp_http(
 
             // Note: use_chunked is already determined earlier in the function
 
-            // Determine if we should use chunked encoding
-            let (transfer_encoding, connection_header) = if use_chunked {
+            // Determine connection header based on encoding
+            let connection_header = if use_chunked {
                 warn!("🔄 Using chunked transfer encoding for streaming client");
-                ("chunked", "keep-alive")
+                "keep-alive"
             } else {
                 warn!("📦 Using standard HTTP response (Content-Length)");
-                ("", "close")
+                "close"
             };
 
             // === COMPREHENSIVE HTTP HEADER ANALYSIS ===
@@ -553,34 +562,20 @@ async fn handle_mcp_http(
                 warn!("   Will NOT set Transfer-Encoding (prevents protocol violation)");
             }
 
-            // Create the response with Strategy 1: Immediate progress with chunked encoding
-            let base_reply = if let Some(ref notifications) = progress_notifications {
-                // === STRATEGY 1: IMMEDIATE PROGRESS WITH CHUNKED ENCODING ===
-                // This approach has been tested and proven to work with Cursor
+            // Create the response - CRITICAL: Never set both Content-Length and Transfer-Encoding
+            let base_reply = if use_chunked {
+                // === CHUNKED ENCODING FOR PROGRESS TOKENS ===
+                warn!("🔄 Using Transfer-Encoding: chunked for progress support");
                 warn!(
-                    "📡 STRATEGY 1: IMPLEMENTING IMMEDIATE PROGRESS WITH CHUNKED ENCODING ({} NOTIFICATIONS)",
-                    notifications.len()
+                    "   Response size: {} bytes (no Content-Length header)",
+                    response_size
                 );
 
-                // Strategy 1: Send only the final response - progress notifications are handled by MCP client
-                // This prevents Cursor from seeing "undefined" due to multiple JSON objects
-                let final_response_json =
-                    serde_json::to_string(&response).unwrap_or_else(|_| "{}".to_string());
-                warn!(
-                    "📤 STRATEGY 1: FINAL RESPONSE ONLY: {} bytes",
-                    final_response_json.len()
-                );
-                warn!(
-                    "📊 STRATEGY 1: PROGRESS NOTIFICATIONS: {} (handled by MCP client)",
-                    notifications.len()
-                );
-                warn!("🚀 STRATEGY 1: USING IMMEDIATE PROGRESS WITH CHUNKED ENCODING");
-
-                // Strategy 1: Use chunked encoding for immediate progress notifications
+                // IMPORTANT: Do NOT set Content-Length when using chunked encoding
                 reply::with_header(
                     reply::with_header(
                         reply::with_status(
-                            warp::reply::Response::new(final_response_json.into()),
+                            warp::reply::Response::new(response_json.into()),
                             status,
                         ),
                         "content-type",
@@ -589,9 +584,14 @@ async fn handle_mcp_http(
                     "transfer-encoding",
                     "chunked",
                 )
-            } else if !use_chunked {
-                warn!("📏 Setting Content-Length: {} bytes", response_size);
-                // For standard responses, set Content-Length and no Transfer-Encoding
+            } else {
+                // === STANDARD RESPONSE WITH CONTENT-LENGTH ===
+                warn!(
+                    "📏 Using Content-Length: {} bytes (no Transfer-Encoding)",
+                    response_size
+                );
+
+                // IMPORTANT: Do NOT set Transfer-Encoding when using Content-Length
                 reply::with_header(
                     reply::with_header(
                         reply::with_status(
@@ -604,21 +604,6 @@ async fn handle_mcp_http(
                     "content-length",
                     response_size.to_string(),
                 )
-            } else {
-                warn!("🔄 Setting Transfer-Encoding: chunked");
-                // For chunked responses, set Transfer-Encoding and no Content-Length
-                reply::with_header(
-                    reply::with_header(
-                        reply::with_status(
-                            warp::reply::Response::new(response_json.into()),
-                            status,
-                        ),
-                        "content-type",
-                        "application/json",
-                    ),
-                    "transfer-encoding",
-                    "chunked",
-                )
             };
 
             // Add connection header
@@ -628,15 +613,21 @@ async fn handle_mcp_http(
             let set_cookie_value = if method == "initialize" && response.get("result").is_some() {
                 let cookie_value = format!(
                     "mcp_session={}; Path=/mcp; HttpOnly; SameSite=Strict",
-                    effective_session_id.as_ref().unwrap()
+                    effective_session_id
+                        .as_ref()
+                        .unwrap_or(&"default".to_string())
                 );
                 info!(
                     "🍪 Set session cookie: {}",
-                    effective_session_id.as_ref().unwrap()
+                    effective_session_id
+                        .as_ref()
+                        .unwrap_or(&"default".to_string())
                 );
                 debug!(
                     "🍪 [COOKIE] Set session cookie value: {}",
-                    effective_session_id.as_ref().unwrap()
+                    effective_session_id
+                        .as_ref()
+                        .unwrap_or(&"default".to_string())
                 );
                 debug!(
                     "🍪 [COOKIE] Incoming session_id from cookie: {:?}",
@@ -982,13 +973,13 @@ fn extract_session_id_from_cookie(cookie: &Option<String>) -> Option<String> {
 /// Generate a new session ID
 fn generate_session_id() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_else(|_| Duration::from_secs(0))
         .as_millis();
     let count = COUNTER.fetch_add(1, Ordering::SeqCst);
     format!("session_{timestamp}_{count}")
@@ -1087,7 +1078,10 @@ mod tests {
 
         // Should have correct content type header
         let headers = response.headers();
-        assert_eq!(headers.get("content-type").unwrap(), "application/json");
+        assert_eq!(
+            headers.get("content-type").and_then(|v| v.to_str().ok()),
+            Some("application/json")
+        );
     }
 
     #[test]

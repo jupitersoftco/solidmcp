@@ -165,14 +165,18 @@ impl McpProtocolHandlerImpl {
         info!("🔧 [INIT] Processing MCP initialization request");
         info!(
             "   📋 Input params: {}",
-            serde_json::to_string_pretty(&params).unwrap()
+            serde_json::to_string_pretty(&params).unwrap_or_else(|_| "<invalid json>".to_string())
         );
         info!("   📋 Current initialized state: {}", self.initialized);
 
         // Check if already initialized
         if self.initialized {
-            error!("❌ [INIT] Already initialized! Rejecting second initialization attempt");
-            return Err(McpError::Internal("Already initialized".to_string()).into());
+            info!("⚠️  [INIT] Already initialized! Allowing re-initialization");
+            // Reset state for clean re-initialization
+            self.initialized = false;
+            self.client_info = None;
+            self.protocol_version = None;
+            info!("🔄 [INIT] State reset for re-initialization");
         }
 
         // Store client info if provided
@@ -264,10 +268,13 @@ impl McpProtocolHandlerImpl {
         info!("📋 Processing MCP tools list request");
         info!("   🎯 Using protocol version: {:?}", self.protocol_version);
         let response = McpTools::get_tools_list_for_version(self.protocol_version.as_deref());
+        let tools_count = response["tools"]
+            .as_array()
+            .map(|arr| arr.len())
+            .unwrap_or(0);
         info!(
             "📋 Returning {} available tools for protocol version {:?}",
-            response["tools"].as_array().unwrap().len(),
-            self.protocol_version
+            tools_count, self.protocol_version
         );
         Ok(response)
     }

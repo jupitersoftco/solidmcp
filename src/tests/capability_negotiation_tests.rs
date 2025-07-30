@@ -202,7 +202,7 @@ mod tests {
             }
         });
 
-        let result = handler.handle_message(init).await.unwrap();
+        let _result = handler.handle_message(init).await.unwrap();
 
         // Built-in handler may not support resources, but should respond gracefully
         let resources_request = json!({
@@ -238,7 +238,7 @@ mod tests {
             }
         });
 
-        let result = handler.handle_message(init).await.unwrap();
+        let _result = handler.handle_message(init).await.unwrap();
 
         // Test prompts/list
         let prompts_request = json!({
