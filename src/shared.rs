@@ -1,7 +1,41 @@
 //! MCP Protocol Engine
 //!
-//! Core protocol routing and session management for MCP messages.
-//! Routes JSON-RPC messages to user-provided handler implementations.
+//! This module provides the core protocol routing and session management for MCP messages.
+//! The `McpProtocolEngine` is responsible for maintaining per-session state, routing
+//! JSON-RPC messages to appropriate handlers, and managing protocol version negotiation.
+//!
+//! # Architecture
+//!
+//! The engine maintains a separate protocol handler for each session, ensuring proper
+//! client isolation. It routes incoming JSON-RPC messages to either user-provided
+//! handlers or the built-in protocol implementation.
+//!
+//! # Session Management
+//!
+//! - WebSocket connections maintain state per connection
+//! - HTTP connections use session cookies for state persistence
+//! - Sessions can be re-initialized (important for reconnecting clients)
+//!
+//! # Example
+//!
+//! ```rust
+//! use solidmcp::shared::McpProtocolEngine;
+//! use std::sync::Arc;
+//!
+//! // Create engine with custom handler
+//! let handler = Arc::new(MyHandler::new());
+//! let engine = McpProtocolEngine::with_handler(handler);
+//!
+//! // Handle a message
+//! let message = serde_json::json!({
+//!     "jsonrpc": "2.0",
+//!     "method": "initialize",
+//!     "params": {},
+//!     "id": 1
+//! });
+//!
+//! let response = engine.handle_message(message, Some("session-123".to_string())).await?;
+//! ```
 
 use {
     super::protocol_impl::McpProtocolHandlerImpl,
@@ -13,6 +47,21 @@ use {
     tracing::{debug, trace},
 };
 
+/// Core protocol engine for routing MCP messages and managing sessions.
+///
+/// The `McpProtocolEngine` is the central message router that maintains per-session
+/// protocol handlers and routes messages to the appropriate handler implementation.
+/// It supports both custom handlers and a built-in default implementation.
+///
+/// # Thread Safety
+///
+/// The engine is thread-safe and can be shared across multiple connections using
+/// `Arc`. Session handlers are protected by a mutex to ensure safe concurrent access.
+///
+/// # Fields
+///
+/// - `session_handlers`: Thread-safe map of session IDs to protocol handler instances
+/// - `handler`: Optional custom handler implementing the `McpHandler` trait
 pub struct McpProtocolEngine {
     // Maintain protocol handlers per session ID for proper client isolation
     session_handlers: Arc<Mutex<HashMap<String, McpProtocolHandlerImpl>>>,
@@ -27,6 +76,21 @@ impl Default for McpProtocolEngine {
 }
 
 impl McpProtocolEngine {
+    /// Create a new protocol engine with no custom handler.
+    ///
+    /// This creates an engine that uses the built-in protocol implementation
+    /// for all MCP functionality. The built-in handler provides basic protocol
+    /// compliance but no custom tools, resources, or prompts.
+    ///
+    /// # Returns
+    ///
+    /// A new `McpProtocolEngine` instance
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let engine = McpProtocolEngine::new();
+    /// ```
     pub fn new() -> Self {
         Self {
             session_handlers: Arc::new(Mutex::new(HashMap::new())),
@@ -34,6 +98,28 @@ impl McpProtocolEngine {
         }
     }
 
+    /// Create a new protocol engine with a custom handler.
+    ///
+    /// This creates an engine that routes MCP protocol calls to your custom
+    /// handler implementation. The handler will receive all tool calls,
+    /// resource requests, and prompt requests.
+    ///
+    /// # Parameters
+    ///
+    /// - `handler`: Arc-wrapped implementation of the `McpHandler` trait
+    ///
+    /// # Returns
+    ///
+    /// A new `McpProtocolEngine` configured with the custom handler
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use std::sync::Arc;
+    ///
+    /// let handler = Arc::new(MyCustomHandler::new());
+    /// let engine = McpProtocolEngine::with_handler(handler);
+    /// ```
     pub fn with_handler(handler: Arc<dyn super::handler::McpHandler>) -> Self {
         debug!("Handler registered with MCP protocol engine");
         Self {
@@ -44,9 +130,51 @@ impl McpProtocolEngine {
 }
 
 impl McpProtocolEngine {
-    /// Handle an MCP message and return the response
-    /// This is the core logic that works for both WebSocket and HTTP
-    /// Maintains initialization state per session/client
+    /// Handle an MCP message and return the response.
+    ///
+    /// This is the core message routing logic that works for both WebSocket and HTTP
+    /// transports. It maintains initialization state per session/client and routes
+    /// messages to the appropriate handler based on the JSON-RPC method.
+    ///
+    /// # Parameters
+    ///
+    /// - `message`: The JSON-RPC message to process
+    /// - `session_id`: Optional session identifier for maintaining state
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC response message
+    ///
+    /// # Message Routing
+    ///
+    /// The engine routes messages based on the method field:
+    /// - `initialize`: Protocol handshake (always handled by protocol implementation)
+    /// - `tools/*`: Routed to custom handler if available
+    /// - `resources/*`: Routed to custom handler if available
+    /// - `prompts/*`: Routed to custom handler if available
+    /// - Others: Handled by the protocol implementation
+    ///
+    /// # Error Handling
+    ///
+    /// Returns JSON-RPC error responses for:
+    /// - Malformed messages (-32700 Parse error)
+    /// - Invalid requests (-32600 Invalid Request)
+    /// - Unknown methods (-32601 Method not found)
+    /// - Handler errors (-32603 Internal error)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let message = json!({
+    ///     "jsonrpc": "2.0",
+    ///     "method": "tools/list",
+    ///     "id": 1
+    /// });
+    ///
+    /// let response = engine.handle_message(message, Some("session-123".to_string())).await?;
+    /// assert_eq!(response["jsonrpc"], "2.0");
+    /// assert_eq!(response["id"], 1);
+    /// ```
     pub async fn handle_message(
         &self,
         message: Value,

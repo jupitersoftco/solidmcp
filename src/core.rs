@@ -20,7 +20,26 @@ pub struct McpServer {
 }
 
 impl McpServer {
-    /// Create a new MCP server instance
+    /// Create a new MCP server instance with the default built-in handler.
+    ///
+    /// This creates a server with a basic handler that provides minimal MCP
+    /// functionality. For most use cases, you'll want to use `with_handler()`
+    /// or the framework API instead.
+    ///
+    /// # Returns
+    ///
+    /// A new `McpServer` instance ready to be started
+    ///
+    /// # Errors
+    ///
+    /// Currently this function doesn't fail, but returns Result for future compatibility
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut server = McpServer::new().await?;
+    /// server.start(3000).await?;
+    /// ```
     pub async fn new() -> Result<Self> {
         let protocol = McpProtocol::new();
         let protocol_engine = Arc::new(McpProtocolEngine::new());
@@ -32,7 +51,51 @@ impl McpServer {
         })
     }
 
-    /// Create a new MCP server instance with a custom handler
+    /// Create a new MCP server instance with a custom handler.
+    ///
+    /// This is the primary way to create a server with your own functionality.
+    /// The handler you provide will receive all MCP protocol calls and can
+    /// implement tools, resources, and prompts.
+    ///
+    /// # Parameters
+    ///
+    /// - `handler`: An Arc-wrapped implementation of the `McpHandler` trait
+    ///
+    /// # Returns
+    ///
+    /// A new `McpServer` instance configured with your handler
+    ///
+    /// # Errors
+    ///
+    /// Currently this function doesn't fail, but returns Result for future compatibility
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use solidmcp::{McpServer, handler::McpHandler};
+    /// use std::sync::Arc;
+    /// use async_trait::async_trait;
+    /// use anyhow::Result;
+    /// use serde_json::Value;
+    ///
+    /// struct MyHandler;
+    ///
+    /// #[async_trait]
+    /// impl McpHandler for MyHandler {
+    ///     async fn list_tools(&self, context: &McpContext) -> Result<Vec<ToolDefinition>> {
+    ///         // Return your tools
+    ///         Ok(vec![])
+    ///     }
+    ///     
+    ///     async fn call_tool(&self, name: &str, arguments: Value, context: &McpContext) -> Result<Value> {
+    ///         // Handle tool calls
+    ///         Err(anyhow::anyhow!("No tools available"))
+    ///     }
+    /// }
+    ///
+    /// let handler = Arc::new(MyHandler);
+    /// let mut server = McpServer::with_handler(handler).await?;
+    /// ```
     pub async fn with_handler(handler: Arc<dyn super::handler::McpHandler>) -> Result<Self> {
         let protocol = McpProtocol::new();
         let protocol_engine = Arc::new(McpProtocolEngine::with_handler(handler));
@@ -44,7 +107,46 @@ impl McpServer {
         })
     }
 
-    /// Start the MCP server (WebSocket + HTTP)
+    /// Start the MCP server on the specified port.
+    ///
+    /// This method starts the server listening on the given port for both
+    /// WebSocket and HTTP connections. The server automatically detects the
+    /// transport type based on request headers and handles each accordingly.
+    ///
+    /// # Parameters
+    ///
+    /// - `port`: The TCP port to listen on (e.g., 3000, 8080)
+    ///
+    /// # Returns
+    ///
+    /// This method runs indefinitely until the server is shut down
+    ///
+    /// # Errors
+    ///
+    /// - Port binding errors if the port is already in use
+    /// - Network errors during operation
+    ///
+    /// # Transport Support
+    ///
+    /// The server supports:
+    /// - **WebSocket**: For clients that send `Upgrade: websocket` header
+    /// - **HTTP**: For clients that send `Content-Type: application/json`
+    /// - **SSE**: For HTTP clients that accept `text/event-stream`
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
+    ///     let mut server = McpServer::new().await?;
+    ///     
+    ///     // Start server on port 3000
+    ///     println!("Server running on http://localhost:3000");
+    ///     server.start(3000).await?;
+    ///     
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn start(&mut self, port: u16) -> Result<()> {
         info!("🚀 Starting MCP Server on port {}", port);
 
@@ -86,13 +188,31 @@ impl McpServer {
         Ok(())
     }
 
-    /// Get a new handler instance for processing messages
+    /// Get a new handler instance for processing messages.
+    ///
+    /// This method creates a new `McpHandlers` instance with a fresh debug logger.
+    /// It's primarily used internally by the transport layers.
+    ///
+    /// # Returns
+    ///
+    /// A new `McpHandlers` instance with a unique connection ID
+    ///
+    /// # Note
+    ///
+    /// This is mainly for internal use and backward compatibility
     pub fn create_handler(&self) -> McpHandlers {
         let logger = McpDebugLogger::new(super::logging::McpConnectionId::new());
         McpHandlers::new(logger)
     }
 
-    /// Get the protocol instance
+    /// Get the protocol instance.
+    ///
+    /// Provides access to the underlying protocol configuration and utilities.
+    /// This is primarily for internal use.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `McpProtocol` instance
     pub fn protocol(&self) -> &McpProtocol {
         &self.protocol
     }
