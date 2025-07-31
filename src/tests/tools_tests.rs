@@ -89,9 +89,13 @@ async fn test_mcp_tool_call() {
     assert!(response["result"].is_object());
     assert!(response["result"]["content"].is_array());
 
+    // With the new format, structured data is directly available in the "data" field
+    let data = &response["result"]["data"];
+    assert_eq!(data["echo"], "Hello from test!");
+    
+    // The content should also have a human-readable summary
     let content = response["result"]["content"][0]["text"].as_str().unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
-    assert_eq!(parsed["echo"], "Hello from test!");
+    assert!(content.contains("Echo: Hello from test!"));
 }
 
 #[tokio::test]

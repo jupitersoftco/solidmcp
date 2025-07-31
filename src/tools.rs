@@ -124,15 +124,57 @@ impl McpTools {
             "\u{1F6E0}\u{FE0F}  Tool '{}' executed successfully",
             tool_name
         );
-        let text = serde_json::to_string(&result)?;
+        
+        // Return structured data directly for programmatic consumption
+        // instead of stringifying it into human-readable text
         Ok(json!({
             "content": [
                 {
-                    "type": "text",
-                    "text": text
+                    "type": "text", 
+                    "text": Self::format_result_summary(&result, tool_name)
                 }
-            ]
+            ],
+            "data": result  // Structured data for programmatic access
         }))
+    }
+
+    /// Format a human-readable summary of the result while preserving structured data
+    fn format_result_summary(result: &Value, tool_name: &str) -> String {
+        match tool_name {
+            "echo" => {
+                if let Some(message) = result.get("echo").and_then(|v| v.as_str()) {
+                    format!("Echo: {}", message)
+                } else {
+                    "Echo completed".to_string()
+                }
+            },
+            "read_file" => {
+                if let Some(error) = result.get("error") {
+                    format!("File read error: {}", error)
+                } else if let Some(path) = result.get("file_path").and_then(|v| v.as_str()) {
+                    if let Some(content) = result.get("content").and_then(|v| v.as_str()) {
+                        let len = content.len();
+                        format!("Successfully read file '{}' ({} bytes)", path, len)
+                    } else {
+                        format!("Read file: {}", path)
+                    }
+                } else {
+                    "File read completed".to_string()
+                }
+            },
+            _ => {
+                // For search results or other tools, try to extract meaningful info
+                if let Some(query) = result.get("query").and_then(|v| v.as_str()) {
+                    if let Some(results) = result.get("results").and_then(|v| v.as_array()) {
+                        format!("Found {} results for query '{}'", results.len(), query)
+                    } else {
+                        format!("Search completed for query '{}'", query)
+                    }
+                } else {
+                    format!("Tool '{}' completed successfully", tool_name)
+                }
+            }
+        }
     }
 
     /// Echo handler for MCP

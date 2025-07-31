@@ -48,9 +48,9 @@ mod tests {
         let result = McpTools::execute_tool("read_file", tool_params)
             .await
             .unwrap();
-        let content = result["content"][0]["text"].as_str().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
-        assert_eq!(parsed["content"], "hello-mcp");
+        // With the new format, structured data is directly available in the "data" field
+        let data = &result["data"];
+        assert_eq!(data["content"], "hello-mcp");
     }
 
     #[tokio::test]
@@ -81,9 +81,13 @@ mod tests {
         });
 
         let result = McpTools::execute_tool("echo", tool_params).await.unwrap();
+        // With the new format, structured data is directly available in the "data" field
+        let data = &result["data"];
+        assert_eq!(data["echo"], "Hello, MCP!");
+        
+        // The content should also have a human-readable summary
         let content = result["content"][0]["text"].as_str().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
-        assert_eq!(parsed["echo"], "Hello, MCP!");
+        assert!(content.contains("Echo: Hello, MCP!"));
     }
 
     #[tokio::test]
@@ -95,11 +99,14 @@ mod tests {
         let result = McpTools::execute_tool("read_file", tool_params)
             .await
             .unwrap();
+        // With the new format, structured data is directly available in the "data" field
+        let data = &result["data"];
+        assert_eq!(data["file_path"], "Cargo.toml");
+        assert!(data["content"].as_str().is_some());
+        
+        // The content should also have a human-readable summary
         let content = result["content"][0]["text"].as_str().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
-
-        assert_eq!(parsed["file_path"], "Cargo.toml");
-        assert!(parsed["content"].as_str().is_some());
+        assert!(content.contains("Successfully read file 'Cargo.toml'"));
     }
 
     #[tokio::test]
