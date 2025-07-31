@@ -5,16 +5,10 @@
 
 use {
     anyhow::Result,
+    async_trait::async_trait,
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
-    std::{
-        fs,
-        path::PathBuf,
-        sync::Arc,
-        time::Duration,
-    },
-    tempfile::TempDir,
-    tokio::time::timeout,
+    std::{sync::Arc, time::Duration},
     tokio_tungstenite::{connect_async, tungstenite::Message},
     solidmcp::{
         framework::{McpServerBuilder, ResourceProvider},
@@ -58,7 +52,7 @@ impl TestResourceProvider {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl ResourceProvider<()> for TestResourceProvider {
     async fn list_resources(&self, _context: Arc<()>) -> Result<Vec<ResourceInfo>> {
         Ok(self.resources.clone())
@@ -116,8 +110,9 @@ async fn test_websocket_resources_list() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        let _init_response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        let _init_response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test resources/list
         let list_request = json!({
@@ -127,8 +122,9 @@ async fn test_websocket_resources_list() -> Result<()> {
             "params": {}
         });
 
-        write.send(Message::Text(list_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(list_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Verify response structure
@@ -171,8 +167,9 @@ async fn test_websocket_resources_read() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test resources/read
         let read_request = json!({
@@ -184,8 +181,9 @@ async fn test_websocket_resources_read() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(read_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(read_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Verify response structure
@@ -291,8 +289,9 @@ async fn test_resource_not_found() -> Result<()> {
             "params": {}
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Try to read non-existent resource
         let read_request = json!({
@@ -304,8 +303,9 @@ async fn test_resource_not_found() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(read_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(read_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Should return error
@@ -321,7 +321,8 @@ async fn test_resource_not_found() -> Result<()> {
 
 // Override the test server creation to use our resource provider
 async fn start_test_server_with_resources() -> Result<u16> {
-    let port = find_available_port().await?;
+    let port = find_available_port().await
+        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
     let mut server = create_resource_test_server(()).await?;
     
     tokio::spawn(async move {
