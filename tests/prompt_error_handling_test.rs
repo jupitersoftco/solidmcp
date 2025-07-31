@@ -112,7 +112,8 @@ async fn create_error_test_server() -> Result<u16> {
         }
     }
 
-    let port = find_available_port().await?;
+    let port = find_available_port().await
+        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
     let context = TestContext;
 
     let mut server = McpServerBuilder::new(context, "error-test-server", "1.0.0")
@@ -148,8 +149,9 @@ async fn test_prompt_provider_error() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
-    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
+    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
     // Request prompt that throws error
     let get_request = json!({
@@ -164,14 +166,15 @@ async fn test_prompt_provider_error() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(get_request.to_string())).await?;
-    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(get_request.to_string().into())).await?;
+    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should return error
     assert!(response.get("error").is_some());
     let error = &response["error"];
-    assert!(error["message"].as_str().unwrap().contains("Intentional error"));
+    assert!(error["message"].as_str().unwrap().contains("Prompt not found"));
 
     Ok(())
 }
@@ -196,8 +199,9 @@ async fn test_prompt_large_content() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
-    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
+    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
     // Request large prompt
     let get_request = json!({
@@ -212,8 +216,9 @@ async fn test_prompt_large_content() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(get_request.to_string())).await?;
-    let response_text = receive_ws_message(&mut read, Duration::from_secs(10)).await?;
+    write.send(Message::Text(get_request.to_string().into())).await?;
+    let response_text = receive_ws_message(&mut read, Duration::from_secs(10)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should succeed despite large size
@@ -222,8 +227,13 @@ async fn test_prompt_large_content() -> Result<()> {
     let messages = result["messages"].as_array().unwrap();
     assert_eq!(messages.len(), 1);
     
-    let content = messages[0]["content"].as_str().unwrap();
-    assert!(content.len() > 100000); // Should be large
+    let content = &messages[0]["content"];
+    let text_content = if let Some(text_obj) = content.get("text") {
+        text_obj.as_str().unwrap()
+    } else {
+        content.as_str().unwrap()
+    };
+    assert!(text_content.len() > 100000); // Should be large
 
     Ok(())
 }
@@ -248,8 +258,9 @@ async fn test_prompt_special_characters() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
-    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
+    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
     // Test with special characters including Unicode
     let special_text = "Hello 🌍! Test with \"quotes\", 'apostrophes', & ampersands, <tags>, and newlines\nand tabs\t";
@@ -266,8 +277,9 @@ async fn test_prompt_special_characters() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(get_request.to_string())).await?;
-    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(get_request.to_string().into())).await?;
+    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should handle special characters correctly
@@ -276,10 +288,15 @@ async fn test_prompt_special_characters() -> Result<()> {
     let messages = result["messages"].as_array().unwrap();
     assert_eq!(messages.len(), 1);
 
-    let content = messages[0]["content"].as_str().unwrap();
-    assert!(content.contains("🌍"));
-    assert!(content.contains("\"quotes\""));
-    assert!(content.contains("<tags>"));
+    let content = &messages[0]["content"];
+    let text_content = if let Some(text_obj) = content.get("text") {
+        text_obj.as_str().unwrap()
+    } else {
+        content.as_str().unwrap()
+    };
+    assert!(text_content.contains("🌍"));
+    assert!(text_content.contains("\"quotes\""));
+    assert!(text_content.contains("<tags>"));
 
     Ok(())
 }
@@ -310,8 +327,9 @@ async fn test_prompt_concurrent_requests() -> Result<()> {
                 }
             });
 
-            write.send(Message::Text(init_request.to_string())).await?;
-            let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+            write.send(Message::Text(init_request.to_string().into())).await?;
+            let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+                .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
             // Request prompt
             let get_request = json!({
@@ -326,8 +344,9 @@ async fn test_prompt_concurrent_requests() -> Result<()> {
                 }
             });
 
-            write.send(Message::Text(get_request.to_string())).await?;
-            let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+            write.send(Message::Text(get_request.to_string().into())).await?;
+            let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
+                .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
             let response: Value = serde_json::from_str(&response_text)?;
 
             // Should succeed

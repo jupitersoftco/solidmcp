@@ -296,7 +296,7 @@ async fn test_resource_metadata() -> Result<()> {
         assert_eq!(unknown_resource["uri"], "data://unknown/format");
         assert!(unknown_resource["mimeType"].is_null());
 
-        Ok(()
+        Ok(())
     }).await
 }
 
@@ -346,7 +346,7 @@ async fn test_large_content_handling() -> Result<()> {
         assert!(text_content.contains("Line 1:"));
         assert!(text_content.contains("Line 1000:"));
 
-        Ok(()
+        Ok(())
     }).await
 }
 
@@ -394,7 +394,7 @@ async fn test_unicode_content() -> Result<()> {
         assert!(text.contains("日本語"));
         assert!(text.contains("🚀"));
 
-        Ok(()
+        Ok(())
     }).await
 }
 

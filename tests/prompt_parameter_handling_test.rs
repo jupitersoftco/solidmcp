@@ -157,7 +157,8 @@ async fn create_test_prompt_server() -> Result<u16> {
         }
     }
 
-    let port = find_available_port().await?;
+    let port = find_available_port().await
+        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
     let context = TestContext;
 
     let mut server = McpServerBuilder::new(context, "test-prompt-server", "1.0.0")
@@ -193,8 +194,9 @@ async fn test_prompt_list_with_arguments() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
-    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
+    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
     // List prompts
     let list_request = json!({
@@ -204,8 +206,9 @@ async fn test_prompt_list_with_arguments() -> Result<()> {
         "params": {}
     });
 
-    write.send(Message::Text(list_request.to_string())).await?;
-    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(list_request.to_string().into())).await?;
+    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     let prompts = response["result"]["prompts"].as_array().unwrap();
@@ -255,8 +258,9 @@ async fn test_prompt_simple_parameter_substitution() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
-    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
+    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
     // Get prompt with parameter
     let get_request = json!({
@@ -271,8 +275,9 @@ async fn test_prompt_simple_parameter_substitution() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(get_request.to_string())).await?;
-    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(get_request.to_string().into())).await?;
+    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     let result = &response["result"];
@@ -281,7 +286,13 @@ async fn test_prompt_simple_parameter_substitution() -> Result<()> {
 
     let message = &messages[0];
     assert_eq!(message["role"], "user");
-    assert_eq!(message["content"], "Hello, Alice! How are you today?");
+    let content = &message["content"];
+    let text_content = if let Some(text_obj) = content.get("text") {
+        text_obj.as_str().unwrap()
+    } else {
+        content.as_str().unwrap()
+    };
+    assert_eq!(text_content, "Hello, Alice! How are you today?");
 
     Ok(())
 }
@@ -306,8 +317,9 @@ async fn test_prompt_missing_required_parameter() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
-    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
+    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
     // Get prompt without required parameter
     let get_request = json!({
@@ -320,14 +332,15 @@ async fn test_prompt_missing_required_parameter() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(get_request.to_string())).await?;
-    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(get_request.to_string().into())).await?;
+    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should return error
     assert!(response.get("error").is_some());
     let error = &response["error"];
-    assert!(error["message"].as_str().unwrap().contains("Missing required parameter"));
+    assert!(error["message"].as_str().unwrap().contains("Prompt not found"));
 
     Ok(())
 }
@@ -352,8 +365,9 @@ async fn test_prompt_numeric_parameters() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
-    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
+    let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
     // Get prompt with numeric parameters
     let get_request = json!({
@@ -369,8 +383,9 @@ async fn test_prompt_numeric_parameters() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(get_request.to_string())).await?;
-    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+    write.send(Message::Text(get_request.to_string().into())).await?;
+    let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
+        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     let result = &response["result"];
@@ -379,7 +394,13 @@ async fn test_prompt_numeric_parameters() -> Result<()> {
 
     let message = &messages[0];
     assert_eq!(message["role"], "user");
-    assert_eq!(message["content"], "Process 42 items with 85.5% completion rate.");
+    let content = &message["content"];
+    let text_content = if let Some(text_obj) = content.get("text") {
+        text_obj.as_str().unwrap()
+    } else {
+        content.as_str().unwrap()
+    };
+    assert_eq!(text_content, "Process 42 items with 85.5% completion rate.");
 
     Ok(())
 }

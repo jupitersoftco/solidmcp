@@ -155,8 +155,9 @@ async fn test_file_scheme_uri() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test file:// URI
         let read_request = json!({
@@ -168,8 +169,9 @@ async fn test_file_scheme_uri() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(read_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(read_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         assert!(parsed["result"].is_object());
@@ -199,8 +201,9 @@ async fn test_http_schemes_uri() -> Result<()> {
             "params": {}
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test HTTP URI
         let http_request = json!({
@@ -212,8 +215,9 @@ async fn test_http_schemes_uri() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(http_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(http_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -230,8 +234,9 @@ async fn test_http_schemes_uri() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(https_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(https_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -259,8 +264,9 @@ async fn test_custom_schemes_uri() -> Result<()> {
             "params": {}
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test custom scheme
         let custom_request = json!({
@@ -272,8 +278,9 @@ async fn test_custom_schemes_uri() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(custom_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(custom_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -301,8 +308,9 @@ async fn test_complex_uri_components() -> Result<()> {
             "params": {}
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test complex URI
         let complex_uri = "scheme://host:8080/path?query=value#fragment";
@@ -315,8 +323,9 @@ async fn test_complex_uri_components() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(complex_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(complex_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -344,8 +353,9 @@ async fn test_uri_special_characters() -> Result<()> {
             "params": {}
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test URL-encoded characters
         let encoded_request = json!({
@@ -357,8 +367,9 @@ async fn test_uri_special_characters() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(encoded_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(encoded_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -386,8 +397,9 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
             "params": {}
         });
 
-        write.send(Message::Text(init_request.to_string())).await?;
-        receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(init_request.to_string().into())).await?;
+        receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test unsupported scheme
         let unsupported_request = json!({
@@ -399,8 +411,9 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
             }
         });
 
-        write.send(Message::Text(unsupported_request.to_string())).await?;
-        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
+        write.send(Message::Text(unsupported_request.to_string().into())).await?;
+        let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
+            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Should return error for unsupported scheme
@@ -416,7 +429,8 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
 
 // Helper function to create URI test server
 async fn start_uri_test_server() -> Result<u16> {
-    let port = find_available_port().await?;
+    let port = find_available_port().await
+        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
     let mut server = create_uri_test_server().await?;
     
     tokio::spawn(async move {
