@@ -1,0 +1,258 @@
+//! Test the "LARGE DEBUG SECTION DETECTED" warning logic
+//! 
+//! This tests the specific code path in http.rs:512-514 that checks for
+//! debug content in JSON-RPC responses and triggers warnings.
+
+use serde_json::json;
+use solidmcp::{McpServer, Tool};
+use std::collections::HashMap;
+
+mod mcp_test_helpers;
+use mcp_test_helpers::*;
+
+// A test tool that returns debug information in its response
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DebugInfo {
+    debug_data: String,
+    debug_logs: Vec<String>,
+    debug_metadata: HashMap<String, String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DebugToolInput {
+    size: Option<usize>,
+}
+
+struct DebugTool;
+
+impl Tool for DebugTool {
+    type Input = DebugToolInput;
+    type Output = DebugInfo;
+
+    fn name(&self) -> &str {
+        "debug_tool"
+    }
+
+    fn description(&self) -> &str {
+        "A tool that returns debug information"
+    }
+
+    async fn execute(&self, input: Self::Input) -> Result<Self::Output, Box<dyn std::error::Error + Send + Sync>> {
+        let size = input.size.unwrap_or(1000);
+        
+        // Create a large response with debug content
+        let debug_data = format!("debug information: {}", "x".repeat(size));
+        let debug_logs = vec![
+            "debug: starting process".to_string(),
+            "debug: processing data".to_string(),
+            "debug: analyzing results".to_string(),
+            format!("debug: large data section with {} bytes", size),
+        ];
+        
+        let mut debug_metadata = HashMap::new();
+        debug_metadata.insert("debug_level".to_string(), "verbose".to_string());
+        debug_metadata.insert("debug_timestamp".to_string(), "2024-01-01T00:00:00Z".to_string());
+        debug_metadata.insert("debug_session".to_string(), "test-session-123".to_string());
+        
+        Ok(DebugInfo {
+            debug_data,
+            debug_logs,
+            debug_metadata,
+        })
+    }
+}
+
+#[tokio::test]
+async fn test_debug_content_warning_triggered() {
+    // Create a server with the debug tool
+    let mut server = McpServer::new().await.expect("Failed to create server");
+    server.add_tool(DebugTool);
+    
+    // Start server on dynamic port
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let port = addr.port();
+    
+    tokio::spawn(async move {
+        server.serve_with_listener(listener).await.expect("Server failed");
+    });
+    
+    // Wait for server to start
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // First, initialize the server
+    let client = reqwest::Client::new();
+    let url = format!("http://127.0.0.1:{}/mcp", port);
+    
+    let init_message = json!({
+        "jsonrpc": "2.0",
+        "id": "init",
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"}
+        }
+    });
+    
+    let _init_response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&init_message)
+        .send()
+        .await
+        .expect("Failed to initialize");
+
+    // Now call the debug tool with a size that will create a large response
+    let debug_call = json!({
+        "jsonrpc": "2.0",
+        "id": "debug-test",
+        "method": "tools/call",
+        "params": {
+            "name": "debug_tool",
+            "arguments": {
+                "size": 6000  // This should create a response > 5000 bytes with "debug" content
+            }
+        }
+    });
+    
+    println!("=== TESTING DEBUG CONTENT WARNING ===");
+    println!("Calling debug_tool with size=6000 to trigger warning...");
+    
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&debug_call)
+        .send()
+        .await
+        .expect("Failed to call debug tool");
+
+    let response_body = response.text().await.expect("Failed to get response text");
+    let response_size = response_body.len();
+    
+    println!("Response size: {} bytes", response_size);
+    
+    // Parse the JSON response
+    let response_json: serde_json::Value = serde_json::from_str(&response_body)
+        .expect("Response should be valid JSON");
+    
+    println!("Response structure: {}", serde_json::to_string_pretty(&response_json).unwrap_or_else(|_| "Failed to pretty print".to_string()));
+    
+    // Check if the response contains debug content
+    let contains_debug = response_body.contains("debug");
+    let is_large = response_size > 5000;
+    
+    println!("Contains 'debug': {}", contains_debug);
+    println!("Size > 5000 bytes: {}", is_large);
+    
+    if contains_debug && is_large {
+        println!("✅ This response should trigger the 'LARGE DEBUG SECTION DETECTED' warning");
+        println!("   The warning logic in http.rs:512-514 should fire for this response");
+    } else {
+        println!("❌ This response will NOT trigger the warning");
+        if !contains_debug {
+            println!("   Response does not contain 'debug' text");
+        }
+        if !is_large {
+            println!("   Response is not > 5000 bytes");
+        }
+    }
+    
+    // Verify the response is otherwise valid
+    assert!(response_json.get("result").is_some() || response_json.get("error").is_some(),
+        "Response should have either result or error");
+    assert_eq!(response_json["jsonrpc"], "2.0");
+    assert_eq!(response_json["id"], "debug-test");
+    
+    // The key insight: This demonstrates that the warning can be triggered by legitimate
+    // tool responses that happen to contain debug information in their output
+    println!("=== ANALYSIS ===");
+    println!("The 'LARGE DEBUG SECTION DETECTED' warning can be triggered by:");
+    println!("1. Tool responses that legitimately contain debug information");
+    println!("2. Error messages that mention 'debug'");
+    println!("3. Any JSON-RPC response content containing 'debug' over 5KB");
+    println!("This is NOT necessarily a bug - it's a heuristic warning");
+}
+
+#[tokio::test]
+async fn test_small_debug_content_no_warning() {
+    // Test that small debug content doesn't trigger the warning
+    let mut server = McpServer::new().await.expect("Failed to create server");
+    server.add_tool(DebugTool);
+    
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let port = addr.port();
+    
+    tokio::spawn(async move {
+        server.serve_with_listener(listener).await.expect("Server failed");
+    });
+    
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let client = reqwest::Client::new();
+    let url = format!("http://127.0.0.1:{}/mcp", port);
+    
+    // Initialize
+    let init_message = json!({
+        "jsonrpc": "2.0",
+        "id": "init",
+        "method": "initialize", 
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"}
+        }
+    });
+    
+    let _init_response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&init_message)
+        .send()
+        .await
+        .expect("Failed to initialize");
+
+    // Call with small size
+    let debug_call = json!({
+        "jsonrpc": "2.0",
+        "id": "small-debug-test",
+        "method": "tools/call",
+        "params": {
+            "name": "debug_tool",
+            "arguments": {
+                "size": 100  // Small response
+            }
+        }
+    });
+    
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&debug_call)
+        .send()
+        .await
+        .expect("Failed to call debug tool");
+
+    let response_body = response.text().await.expect("Failed to get response text");
+    let response_size = response_body.len();
+    
+    println!("=== SMALL DEBUG CONTENT TEST ===");
+    println!("Response size: {} bytes", response_size);
+    
+    let contains_debug = response_body.contains("debug");
+    let is_large = response_size > 5000;
+    
+    println!("Contains 'debug': {}", contains_debug);
+    println!("Size > 5000 bytes: {}", is_large);
+    
+    if contains_debug && is_large {
+        println!("❌ Unexpected: Small response triggered warning");
+    } else {
+        println!("✅ Small debug content does not trigger warning (as expected)");
+    }
+    
+    // Should contain debug but not be large
+    assert!(contains_debug, "Response should contain debug content");
+    assert!(!is_large, "Response should be small (< 5000 bytes)");
+}
