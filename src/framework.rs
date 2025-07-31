@@ -59,6 +59,7 @@
 
 use {
     crate::{
+        content_types::{McpResponse, ToMcpResponse},
         core::McpServer,
         handler::{
             LogLevel, McpContext, McpHandler, McpNotification, PromptContent, PromptInfo,
@@ -302,51 +303,55 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
         Self::default()
     }
 
-    /// Register a tool function with automatic JSON schema generation.
+    /// Register a tool function with type-safe MCP response format.
     ///
-    /// This method automatically generates JSON schemas for the input and output types,
-    /// validates input parameters at runtime, and provides a clean async interface
-    /// for the tool implementation.
+    /// This method ensures all tool responses follow the MCP protocol format by requiring
+    /// tools to return `McpResponse`. This prevents issues where raw data is returned
+    /// instead of properly formatted MCP responses that clients like Claude Code expect.
     ///
     /// # Type Parameters
-    /// - `I`: Input type (must implement `JsonSchema`, `DeserializeOwned`, and `Send`)
-    /// - `O`: Output type (must implement `JsonSchema`, `Serialize`, and `Send`)
+    /// - `I`: Input type (must implement `JsonSchema` and `DeserializeOwned`)
     /// - `F`: Handler function type
     /// - `Fut`: Future returned by the handler function
     ///
     /// # Parameters
     /// - `name`: Unique name for the tool (used by clients to invoke it)
     /// - `description`: Human-readable description of what the tool does
-    /// - `handler`: Async function that implements the tool logic
+    /// - `handler`: Async function that returns an `McpResponse`
     ///
     /// # Examples
     /// ```rust
+    /// use solidmcp::{McpResponse, McpContent, JsonSchema};
+    /// use serde::Deserialize;
+    /// use serde_json::json;
+    ///
     /// #[derive(JsonSchema, Deserialize)]
-    /// struct FileReadInput {
-    ///     path: String,
+    /// struct SearchInput {
+    ///     query: String,
+    ///     limit: Option<u32>,
     /// }
     ///
-    /// #[derive(JsonSchema, Serialize)]
-    /// struct FileReadOutput {
-    ///     content: String,
-    ///     size: u64,
-    /// }
-    ///
-    /// registry.register_tool("read_file", "Read contents of a file", |input: FileReadInput, ctx, notif| async move {
-    ///     notif.info(&format!("Reading file: {}", input.path))?;
-    ///     let content = tokio::fs::read_to_string(&input.path).await?;
-    ///     Ok(FileReadOutput {
-    ///         content,
-    ///         size: content.len() as u64,
-    ///     })
+    /// registry.register_tool("search", "Search the knowledge base", |input: SearchInput, ctx, notif| async move {
+    ///     notif.info(&format!("Searching for: {}", input.query))?;
+    ///     
+    ///     let results = ctx.database.search(&input.query).await?;
+    ///     
+    ///     // Type-safe MCP response - prevents "no results found" issues
+    ///     Ok(McpResponse::with_text_and_data(
+    ///         format!("Found {} results for '{}'", results.len(), input.query),
+    ///         json!({
+    ///             "results": results,
+    ///             "query": input.query,
+    ///             "total": results.len()
+    ///         })
+    ///     ))
     /// });
     /// ```
-    pub fn register_tool<I, O, F, Fut>(&mut self, name: &str, description: &str, handler: F)
+    pub fn register_tool<I, F, Fut>(&mut self, name: &str, description: &str, handler: F)
     where
         I: JsonSchema + DeserializeOwned + Send + 'static,
-        O: JsonSchema + serde::Serialize + Send + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O>> + Send + 'static,
+        Fut: Future<Output = Result<McpResponse>> + Send + 'static,
     {
         let tool_def = ToolDefinition::from_schema::<I>(name, description);
         let handler = Arc::new(handler);
@@ -359,10 +364,10 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
                 let input: I = serde_json::from_value(args)?;
 
                 // Call the handler with clean API
-                let output = handler(input, context, notification_ctx).await?;
+                let mcp_response = handler(input, context, notification_ctx).await?;
 
-                // Serialize output
-                Ok(serde_json::to_value(output)?)
+                // Convert McpResponse to JSON - this ensures MCP protocol compliance
+                Ok(serde_json::to_value(mcp_response)?)
             })
         });
 
@@ -843,76 +848,64 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
         }
     }
 
-    /// Register a tool with automatic schema generation and type-safe routing.
+    /// Register a tool with type-safe MCP response format.
     ///
-    /// This method provides the main way to add functionality to your MCP server.
-    /// It automatically generates JSON schemas for input validation and provides
-    /// a clean, type-safe interface for your tool implementation.
+    /// This method ensures all tools return MCP-compliant responses by requiring
+    /// handlers to return `McpResponse`. This prevents the "no results found" issue
+    /// that occurs when tools return raw JSON data that clients can't properly parse.
     ///
     /// # Type Parameters
     /// - `I`: Input type (must implement `JsonSchema` and `DeserializeOwned`)
-    /// - `O`: Output type (must implement `JsonSchema` and `Serialize`)
     /// - `F`: Handler function type (async closure or function)
     /// - `Fut`: Future type returned by the handler
     ///
     /// # Parameters
     /// - `name`: Unique tool name (used by clients to invoke the tool)
     /// - `description`: Human-readable description of what the tool does
-    /// - `handler`: Async function implementing the tool logic
+    /// - `handler`: Async function that returns an `McpResponse`
     ///
     /// # Returns
     /// The builder (for method chaining)
     ///
     /// # Error Handling
-    /// Tool handlers should return `Result<O>` where the error type implements
+    /// Tool handlers should return `Result<McpResponse>` where the error type implements
     /// `Into<anyhow::Error>`. Any errors will be automatically converted to
     /// MCP protocol errors and sent to the client.
     ///
     /// # Examples
     /// ```rust
-    /// use std::collections::HashMap;
+    /// use solidmcp::{McpServerBuilder, McpResponse, JsonSchema};
+    /// use serde::Deserialize;
+    /// use serde_json::json;
     ///
     /// #[derive(JsonSchema, Deserialize)]
-    /// struct KeyValueInput {
-    ///     key: String,
-    ///     value: String,
+    /// struct SearchInput {
+    ///     query: String,
+    ///     limit: Option<u32>,
     /// }
     ///
-    /// #[derive(JsonSchema, Serialize)]
-    /// struct KeyValueOutput {
-    ///     success: bool,
-    ///     previous_value: Option<String>,
-    /// }
-    ///
-    /// struct Storage {
-    ///     data: tokio::sync::RwLock<HashMap<String, String>>,
-    /// }
-    ///
-    /// let server = McpServerBuilder::new(Storage::new(), "kv-store", "1.0.0")
-    ///     .with_tool("set", "Store a key-value pair", |input: KeyValueInput, ctx: Arc<Storage>, notif| async move {
-    ///         notif.debug(&format!("Setting {}={}", input.key, input.value))?;
+    /// let server = McpServerBuilder::new(AppContext::new(), "search-server", "1.0.0")
+    ///     .with_tool("search", "Search the knowledge base", |input: SearchInput, ctx, notif| async move {
+    ///         notif.info(&format!("Searching for: {}", input.query))?;
     ///         
-    ///         let mut data = ctx.data.write().await;
-    ///         let previous = data.insert(input.key.clone(), input.value.clone());
+    ///         let results = ctx.database.search(&input.query).await?;
     ///         
-    ///         notif.info(&format!("Key '{}' updated", input.key))?;
-    ///         
-    ///         Ok(KeyValueOutput {
-    ///             success: true,
-    ///             previous_value: previous,
-    ///         })
-    ///     })
-    ///     .with_tool("get", "Retrieve a value by key", |input: GetInput, ctx, notif| async move {
-    ///         // Implementation here...
-    ///         Ok(GetOutput { /* ... */ })
+    ///         // Return type-safe MCP response - Claude Code can now parse this correctly
+    ///         Ok(McpResponse::with_text_and_data(
+    ///             format!("Found {} results for '{}'", results.len(), input.query),
+    ///             json!({
+    ///                 "results": results,
+    ///                 "query": input.query,
+    ///                 "total": results.len()
+    ///             })
+    ///         ))
     ///     });
     /// ```
-    pub fn with_tool<I, O, F, Fut>(mut self, name: &str, description: &str, handler: F) -> Self
+    pub fn with_tool<I, F, Fut>(mut self, name: &str, description: &str, handler: F) -> Self
     where
         I: JsonSchema + DeserializeOwned + Send + 'static,
-        O: JsonSchema + serde::Serialize + Send + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O>> + Send + 'static,
+        Fut: Future<Output = Result<McpResponse>> + Send + 'static,
     {
         self.handler
             .registry_mut()
