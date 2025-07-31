@@ -301,8 +301,9 @@ mod tests {
         let response = data.to_mcp_response();
         
         // Should extract meaningful text from JSON
-        assert!(response.content[0].to_string().contains("2 results") || 
-                response.content[0].to_string().contains("ok"));
+        let content_json = serde_json::to_value(&response.content[0]).unwrap();
+        let text = content_json["text"].as_str().unwrap();
+        assert!(text.contains("2 results") || text.contains("ok"));
         assert!(response.data.is_some());
     }
 }
