@@ -265,6 +265,7 @@ pub struct ToolDefinition {
     pub name: String,
     pub description: String,
     pub input_schema: Value,
+    pub output_schema: Option<Value>,
 }
 
 impl ToolDefinition {
@@ -323,6 +324,81 @@ impl ToolDefinition {
             name: name.into(),
             description: description.into(),
             input_schema,
+            output_schema: None,
+        }
+    }
+
+    /// Create a new tool definition with both input and output schemas from JsonSchema types.
+    ///
+    /// This method automatically generates JSON Schemas from Rust types that
+    /// implement the `JsonSchema` trait for both input and output validation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type that implements `schemars::JsonSchema`
+    /// - `O`: Output type that implements `schemars::JsonSchema`
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: The unique name for this tool
+    /// - `description`: Human-readable description of the tool's purpose
+    ///
+    /// # Returns
+    ///
+    /// A new `ToolDefinition` with schemas automatically generated from types `I` and `O`
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use solidmcp::handler::ToolDefinition;
+    /// use schemars::JsonSchema;
+    /// use serde::{Deserialize, Serialize};
+    ///
+    /// #[derive(JsonSchema, Deserialize)]
+    /// struct SearchInput {
+    ///     query: String,
+    ///     limit: u32,
+    /// }
+    ///
+    /// #[derive(JsonSchema, Serialize)]
+    /// struct SearchOutput {
+    ///     results: Vec<String>,
+    ///     total_count: u32,
+    /// }
+    ///
+    /// let tool = ToolDefinition::from_schemas::<SearchInput, SearchOutput>(
+    ///     "search",
+    ///     "Search for items matching a query"
+    /// );
+    /// ```
+    pub fn from_schemas<I: JsonSchema, O: JsonSchema>(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
+        let input_schema = schemars::schema_for!(I);
+        let output_schema = schemars::schema_for!(O);
+        
+        let input_json = serde_json::to_value(input_schema).unwrap_or_else(|_| {
+            serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        });
+        
+        let output_json = serde_json::to_value(output_schema).unwrap_or_else(|_| {
+            serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        });
+
+        Self {
+            name: name.into(),
+            description: description.into(),
+            input_schema: input_json,
+            output_schema: Some(output_json),
         }
     }
 
@@ -344,11 +420,18 @@ impl ToolDefinition {
     /// assert!(json["input_schema"].is_object());
     /// ```
     pub fn to_json(&self) -> Value {
-        serde_json::json!({
+        let mut json = serde_json::json!({
             "name": self.name,
             "description": self.description,
             "input_schema": self.input_schema
-        })
+        });
+        
+        // Add output_schema if present
+        if let Some(ref output_schema) = self.output_schema {
+            json["output_schema"] = output_schema.clone();
+        }
+        
+        json
     }
 }
 
