@@ -9,7 +9,7 @@ use {
         TransportNegotiation,
     },
     super::validation::McpValidator,
-    anyhow::Result,
+    crate::error::McpError,
     serde_json::{json, Value},
     std::sync::Arc,
     tracing::{debug, error, trace, warn},
@@ -711,22 +711,9 @@ async fn handle_mcp_http(
                 "❌ HTTP MCP error: {} (id={:?}, method={:?})",
                 e, message_id, method
             );
-            // Create error response with JSON-RPC error codes
+            // Create error response with JSON-RPC error codes using structured error types
             // Always return 200 OK status, let JSON-RPC handle the error details
-            let error_code = match e.to_string() {
-                s if s.contains("Not initialized") => -32002,
-                s if s.contains("Unknown method") || s.contains("Method not found") => -32601,
-                s if s.contains("Invalid params") => -32602,
-                _ => -32603,
-            };
-            let error_response = json!({
-                "jsonrpc": "2.0",
-                "id": message_id,
-                "error": {
-                    "code": error_code,
-                    "message": format!("{}", e)
-                }
-            });
+            let error_response = e.to_json_rpc_error(Some(message_id));
             debug!("📤 Sending error response: {:?}", error_response);
             Ok(create_error_reply(error_response, StatusCode::OK))
         }

@@ -6,7 +6,7 @@
 mod tests {
     use crate::handler::{McpContext, McpHandler, ToolDefinition};
     use crate::shared::McpProtocolEngine;
-    use anyhow::Result;
+    use crate::error::{McpError, McpResult};
     use async_trait::async_trait;
     use serde_json::{json, Value};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -20,7 +20,7 @@ mod tests {
 
     #[async_trait]
     impl McpHandler for MockHandler {
-        async fn initialize(&self, _params: Value, context: &McpContext) -> Result<Value> {
+        async fn initialize(&self, _params: Value, context: &McpContext) -> McpResult<Value> {
             // Track session IDs
             let mut sessions = self.session_ids_seen.lock().await;
             sessions.push(context.session_id.clone());
@@ -35,7 +35,7 @@ mod tests {
             }))
         }
 
-        async fn list_tools(&self, _context: &McpContext) -> Result<Vec<ToolDefinition>> {
+        async fn list_tools(&self, _context: &McpContext) -> McpResult<Vec<ToolDefinition>> {
             self.call_count.fetch_add(1, Ordering::Relaxed);
             Ok(vec![])
         }
@@ -45,7 +45,7 @@ mod tests {
             _name: &str,
             _arguments: Value,
             _context: &McpContext,
-        ) -> Result<Value> {
+        ) -> McpResult<Value> {
             Ok(json!({"result": "ok"}))
         }
     }

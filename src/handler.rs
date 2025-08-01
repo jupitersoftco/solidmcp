@@ -14,7 +14,7 @@
 //!
 //! ```rust
 //! use solidmcp::handler::{McpHandler, McpContext, ToolDefinition};
-//! use anyhow::Result;
+//! use solidmcp::{McpResult, McpError};
 //! use async_trait::async_trait;
 //! use serde_json::{json, Value};
 //!
@@ -61,16 +61,18 @@
 //!                     .unwrap_or("World");
 //!                 Ok(json!({ "message": format!("Hello, {}!", name) }))
 //!             }
-//!             _ => Err(anyhow::anyhow!("Unknown tool: {}", name))
+//!             _ => Err(McpError::UnknownTool(name.to_string()))
 //!         }
 //!     }
 //! }
 //! ```
 
 use {
-    anyhow::Result, async_trait::async_trait, schemars::JsonSchema, serde_json::Value,
+    async_trait::async_trait, schemars::JsonSchema, serde_json::Value,
     tokio::sync::mpsc,
 };
+
+use crate::error::{McpError, McpResult};
 
 /// Context provided to MCP handler methods.
 ///
@@ -755,7 +757,7 @@ pub struct PromptMessage {
 ///
 /// ```rust
 /// use solidmcp::handler::{McpHandler, McpContext, ToolDefinition};
-/// use anyhow::Result;
+/// use solidmcp::{McpResult, McpError};
 /// use async_trait::async_trait;
 /// use serde_json::{json, Value};
 ///
@@ -777,7 +779,7 @@ pub struct PromptMessage {
 ///                     .unwrap_or("Hello");
 ///                 Ok(json!({ "echoed": message }))
 ///             }
-///             _ => Err(anyhow::anyhow!("Unknown tool: {}", name))
+///             _ => Err(McpError::UnknownTool(name.to_string()))
 ///         }
 ///     }
 /// }
@@ -805,7 +807,7 @@ pub trait McpHandler: Send + Sync {
     /// # Default Implementation
     ///
     /// Returns basic server info with no special capabilities
-    async fn initialize(&self, _params: Value, _context: &McpContext) -> Result<Value> {
+    async fn initialize(&self, _params: Value, _context: &McpContext) -> McpResult<Value> {
         // Default implementation returns basic capabilities
         Ok(serde_json::json!({
             "protocolVersion": "2025-06-18",
@@ -829,7 +831,7 @@ pub trait McpHandler: Send + Sync {
     /// # Returns
     ///
     /// A vector of `ToolDefinition` structs describing available tools
-    async fn list_tools(&self, context: &McpContext) -> Result<Vec<ToolDefinition>>;
+    async fn list_tools(&self, context: &McpContext) -> McpResult<Vec<ToolDefinition>>;
 
     /// Execute a tool.
     ///
@@ -852,7 +854,7 @@ pub trait McpHandler: Send + Sync {
     /// - The tool name is not recognized
     /// - The arguments are invalid
     /// - The tool execution fails
-    async fn call_tool(&self, name: &str, arguments: Value, context: &McpContext) -> Result<Value>;
+    async fn call_tool(&self, name: &str, arguments: Value, context: &McpContext) -> McpResult<Value>;
 
     /// List available resources.
     ///
@@ -870,7 +872,7 @@ pub trait McpHandler: Send + Sync {
     /// # Default Implementation
     ///
     /// Returns an empty vector (no resources)
-    async fn list_resources(&self, _context: &McpContext) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: &McpContext) -> McpResult<Vec<ResourceInfo>> {
         // Default implementation - no resources
         Ok(vec![])
     }
@@ -892,8 +894,8 @@ pub trait McpHandler: Send + Sync {
     /// # Default Implementation
     ///
     /// Returns an error indicating the resource was not found
-    async fn read_resource(&self, uri: &str, _context: &McpContext) -> Result<ResourceContent> {
-        Err(anyhow::anyhow!("Resource not found: {}", uri))
+    async fn read_resource(&self, uri: &str, _context: &McpContext) -> McpResult<ResourceContent> {
+        Err(McpError::UnknownResource(uri.to_string()))
     }
 
     /// List available prompts.
@@ -912,7 +914,7 @@ pub trait McpHandler: Send + Sync {
     /// # Default Implementation
     ///
     /// Returns an empty vector (no prompts)
-    async fn list_prompts(&self, _context: &McpContext) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, _context: &McpContext) -> McpResult<Vec<PromptInfo>> {
         // Default implementation - no prompts
         Ok(vec![])
     }
@@ -940,8 +942,8 @@ pub trait McpHandler: Send + Sync {
         name: &str,
         _arguments: Option<Value>,
         _context: &McpContext,
-    ) -> Result<PromptContent> {
-        Err(anyhow::anyhow!("Prompt not found: {}", name))
+    ) -> McpResult<PromptContent> {
+        Err(McpError::UnknownPrompt(name.to_string()))
     }
 
     /// Handle notification cancellation.
@@ -961,7 +963,7 @@ pub trait McpHandler: Send + Sync {
     /// # Default Implementation
     ///
     /// Acknowledges the cancellation without taking action
-    async fn cancel_notification(&self, _params: Value, _context: &McpContext) -> Result<Value> {
+    async fn cancel_notification(&self, _params: Value, _context: &McpContext) -> McpResult<Value> {
         // Default implementation - acknowledge cancellation
         Ok(serde_json::json!({}))
     }
@@ -983,7 +985,7 @@ pub trait McpHandler: Send + Sync {
     /// # Default Implementation
     ///
     /// Does nothing and returns Ok(())
-    async fn handle_initialized(&self, _context: &McpContext) -> Result<()> {
+    async fn handle_initialized(&self, _context: &McpContext) -> McpResult<()> {
         // Default implementation - do nothing
         Ok(())
     }

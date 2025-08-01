@@ -5,31 +5,20 @@
 use {
     super::protocol::McpProtocol,
     super::tools::McpTools,
-    anyhow::Result,
+    crate::error::{McpError, McpResult},
     serde_json::{json, Value},
-    thiserror::Error,
+    std::sync::atomic::{AtomicBool, Ordering},
+    tokio::sync::RwLock,
     tracing::{debug, error, info},
 };
 
-#[derive(Debug, Error)]
-pub enum McpError {
-    #[error("Unknown method: {0}")]
-    UnknownMethod(String),
-    #[error("Unknown tool: {0}")]
-    UnknownTool(String),
-    #[error("Client not initialized")]
-    NotInitialized,
-    #[error("Invalid params: {0}")]
-    InvalidParams(String),
-    #[error("Internal error: {0}")]
-    Internal(String),
-}
+// McpError is now imported from crate::error
 
 pub struct McpProtocolHandlerImpl {
     protocol: McpProtocol,
-    pub initialized: bool,
-    pub client_info: Option<Value>,
-    pub protocol_version: Option<String>,
+    pub initialized: AtomicBool,
+    pub client_info: RwLock<Option<Value>>,
+    pub protocol_version: RwLock<Option<String>>,
 }
 
 impl McpProtocolHandlerImpl {
@@ -37,38 +26,38 @@ impl McpProtocolHandlerImpl {
     pub fn new() -> Self {
         Self {
             protocol: McpProtocol::new(),
-            initialized: false,
-            client_info: None,
-            protocol_version: None,
+            initialized: AtomicBool::new(false),
+            client_info: RwLock::new(None),
+            protocol_version: RwLock::new(None),
         }
     }
 
     pub fn with_initialized(client_info: Option<Value>, protocol_version: Option<String>) -> Self {
         Self {
             protocol: McpProtocol::new(),
-            initialized: true,
-            client_info,
-            protocol_version,
+            initialized: AtomicBool::new(true),
+            client_info: RwLock::new(client_info),
+            protocol_version: RwLock::new(protocol_version),
         }
     }
 }
 
 impl McpProtocolHandlerImpl {
-    pub async fn handle_message(&mut self, message: Value) -> Result<Value> {
+    pub async fn handle_message(&self, message: Value) -> McpResult<Value> {
         // Validate required JSON-RPC fields
         let jsonrpc = message
             .get("jsonrpc")
             .and_then(|j| j.as_str())
-            .ok_or_else(|| McpError::Internal("Missing or invalid 'jsonrpc' field".to_string()))?;
+            .ok_or_else(|| McpError::InvalidParams("Missing or invalid 'jsonrpc' field".to_string()))?;
 
         if jsonrpc != "2.0" {
-            return Err(McpError::Internal(format!("Invalid jsonrpc version: {jsonrpc}")).into());
+            return Err(McpError::InvalidParams(format!("Invalid jsonrpc version: {jsonrpc}")));
         }
 
         let method = message
             .get("method")
             .and_then(|m| m.as_str())
-            .ok_or_else(|| McpError::Internal("Missing or invalid 'method' field".to_string()))?;
+            .ok_or_else(|| McpError::InvalidParams("Missing or invalid 'method' field".to_string()))?;
         let id = message.get("id").cloned();
         let params = message.get("params").cloned().unwrap_or(json!({}));
         debug!(
@@ -77,7 +66,7 @@ impl McpProtocolHandlerImpl {
         );
         info!(
             "🔍 [MESSAGE] Dispatching method '{}' with id {:?} (initialized: {})",
-            method, id, self.initialized
+            method, id, self.initialized.load(Ordering::Relaxed)
         );
 
         let result = match method {
@@ -86,8 +75,7 @@ impl McpProtocolHandlerImpl {
                 if message.get("params").is_none() {
                     Err(McpError::InvalidParams(
                         "Missing params field for initialize method".to_string(),
-                    )
-                    .into())
+                    ))
                 } else {
                     self.handle_initialize(params).await
                 }
@@ -99,7 +87,7 @@ impl McpProtocolHandlerImpl {
             "notifications/message" => self.handle_logging_notification(params).await,
             _ => {
                 error!("[PROTOCOL] Unknown method: {:?} (id={:?})", method, id);
-                Err(McpError::UnknownMethod(method.to_string()).into())
+                Err(McpError::UnknownMethod(method.to_string()))
             }
         };
         match result {
@@ -119,35 +107,14 @@ impl McpProtocolHandlerImpl {
                     "[PROTOCOL] Error: method={:?}, id={:?}, error={:?}",
                     method, id, e
                 );
-                let (code, msg): (i32, &str) = if let Some(mcp_err) = e.downcast_ref::<McpError>() {
-                    match mcp_err {
-                        McpError::UnknownMethod(_) | McpError::UnknownTool(_) => {
-                            (-32601, "Method not found")
-                        }
-                        McpError::NotInitialized => (-32002, "Not initialized"),
-                        McpError::InvalidParams(msg) => (-32602, msg.as_str()),
-                        McpError::Internal(msg) => (-32603, msg.as_str()),
-                    }
-                } else {
-                    (-32603, "Internal error")
-                };
-                if let Some(id_value) = id {
-                    Ok(self.protocol.create_error_response(id_value, code, msg))
-                } else {
-                    Ok(json!({
-                        "jsonrpc": "2.0",
-                        "error": {
-                            "code": code,
-                            "message": msg
-                        }
-                    }))
-                }
+                let error_response = e.to_json_rpc_error(id.clone());
+                Ok(error_response)
             }
         }
     }
 
     pub fn is_initialized(&self) -> bool {
-        self.initialized
+        self.initialized.load(Ordering::Relaxed)
     }
 
     pub fn protocol_version(&self) -> &str {
@@ -161,27 +128,27 @@ impl McpProtocolHandlerImpl {
 
 impl McpProtocolHandlerImpl {
     /// Handle MCP initialization
-    async fn handle_initialize(&mut self, params: Value) -> Result<Value> {
+    async fn handle_initialize(&self, params: Value) -> McpResult<Value> {
         info!("🔧 [INIT] Processing MCP initialization request");
         info!(
             "   📋 Input params: {}",
             serde_json::to_string_pretty(&params).unwrap_or_else(|_| "<invalid json>".to_string())
         );
-        info!("   📋 Current initialized state: {}", self.initialized);
+        info!("   📋 Current initialized state: {}", self.initialized.load(Ordering::Relaxed));
 
         // Check if already initialized
-        if self.initialized {
+        if self.initialized.load(Ordering::Relaxed) {
             info!("⚠️  [INIT] Already initialized! Allowing re-initialization");
             // Reset state for clean re-initialization
-            self.initialized = false;
-            self.client_info = None;
-            self.protocol_version = None;
+            self.initialized.store(false, Ordering::Relaxed);
+            *self.client_info.write().await = None;
+            *self.protocol_version.write().await = None;
             info!("🔄 [INIT] State reset for re-initialization");
         }
 
         // Store client info if provided
         if let Some(client_info) = params.get("clientInfo") {
-            self.client_info = Some(client_info.clone());
+            *self.client_info.write().await = Some(client_info.clone());
             info!("📋 [INIT] Client info stored: {:?}", client_info);
         } else {
             info!("📋 [INIT] No client info provided");
@@ -203,12 +170,11 @@ impl McpProtocolHandlerImpl {
                 );
                 return Err(McpError::Internal(format!(
                     "Unsupported protocol version: {client_version}. Supported versions: {supported_versions:?}"
-                ))
-                .into());
+                )));
             }
 
             // Store the client's protocol version
-            self.protocol_version = Some(client_version.to_string());
+            *self.protocol_version.write().await = Some(client_version.to_string());
 
             info!(
                 "✅ PROTOCOL VERSION NEGOTIATED: client={}, server supports both {} and {}",
@@ -218,11 +184,11 @@ impl McpProtocolHandlerImpl {
         }
 
         info!("🔧 [INIT] Setting initialized flag to true");
-        self.initialized = true;
-        info!("🔧 [INIT] Initialized flag is now: {}", self.initialized);
+        self.initialized.store(true, Ordering::Relaxed);
+        info!("🔧 [INIT] Initialized flag is now: {}", self.initialized.load(Ordering::Relaxed));
 
         // Create response with the client's protocol version
-        let response = if let Some(ref client_version) = self.protocol_version {
+        let response = if let Some(ref client_version) = *self.protocol_version.read().await {
             // Both protocol versions should enable tools capabilities
             // The key is to indicate that tools are supported and enabled
             let capabilities = json!({
@@ -248,41 +214,41 @@ impl McpProtocolHandlerImpl {
     }
 
     /// Handle tools list request
-    async fn handle_tools_list(&mut self) -> Result<Value> {
+    async fn handle_tools_list(&self) -> McpResult<Value> {
         info!("🔍 [INIT CHECK] Checking initialization status for tools/list request");
-        info!("   📋 Current initialized state: {}", self.initialized);
-        info!("   📋 Protocol version: {:?}", self.protocol_version);
-        info!("   📋 Client info: {:?}", self.client_info);
+        info!("   📋 Current initialized state: {}", self.initialized.load(Ordering::Relaxed));
+        info!("   📋 Protocol version: {:?}", *self.protocol_version.read().await);
+        info!("   📋 Client info: {:?}", *self.client_info.read().await);
 
-        if !self.initialized {
+        if !self.initialized.load(Ordering::Relaxed) {
             error!("❌ [INIT CHECK] Client not initialized! Rejecting tools/list request");
             error!("   📋 This means initialize() was never called or failed");
             error!(
                 "   📋 Current state: initialized={}, protocol_version={:?}",
-                self.initialized, self.protocol_version
+                self.initialized.load(Ordering::Relaxed), *self.protocol_version.read().await
             );
-            return Err(McpError::NotInitialized.into());
+            return Err(McpError::NotInitialized);
         }
 
         info!("✅ [INIT CHECK] Client is initialized, proceeding with tools/list");
         info!("📋 Processing MCP tools list request");
-        info!("   🎯 Using protocol version: {:?}", self.protocol_version);
-        let response = McpTools::get_tools_list_for_version(self.protocol_version.as_deref());
+        info!("   🎯 Using protocol version: {:?}", *self.protocol_version.read().await);
+        let response = McpTools::get_tools_list_for_version(self.protocol_version.read().await.as_deref());
         let tools_count = response["tools"]
             .as_array()
             .map(|arr| arr.len())
             .unwrap_or(0);
         info!(
             "📋 Returning {} available tools for protocol version {:?}",
-            tools_count, self.protocol_version
+            tools_count, *self.protocol_version.read().await
         );
         Ok(response)
     }
 
     /// Handle tool calls
-    async fn handle_tool_call(&mut self, params: Value) -> Result<Value> {
-        if !self.initialized {
-            return Err(McpError::NotInitialized.into());
+    async fn handle_tool_call(&self, params: Value) -> McpResult<Value> {
+        if !self.initialized.load(Ordering::Relaxed) {
+            return Err(McpError::NotInitialized);
         }
 
         let tool_name = params["name"].as_str().ok_or_else(|| {
@@ -298,7 +264,7 @@ impl McpProtocolHandlerImpl {
         if !arguments.is_object() {
             return Err(McpError::InvalidParams(
                 "Arguments must be an object".to_string()
-            ).into());
+            ));
         }
         
         let arguments = arguments.clone();
@@ -316,33 +282,33 @@ impl McpProtocolHandlerImpl {
             Err(e) => {
                 let error_msg = e.to_string();
                 if error_msg.contains("Unknown tool") {
-                    Err(McpError::UnknownTool(tool_name.to_string()).into())
+                    Err(McpError::UnknownTool(tool_name.to_string()))
                 } else if error_msg.contains("Missing required parameter") 
                     || error_msg.contains("cannot be empty") 
                     || error_msg.contains("Wrong type for") {
                     // Convert parameter validation errors to InvalidParams
-                    Err(McpError::InvalidParams(error_msg).into())
+                    Err(McpError::InvalidParams(error_msg))
                 } else {
-                    Err(e)
+                    Err(McpError::Internal(e.to_string()))
                 }
             }
         }
     }
 
     /// Handle cancel notifications
-    async fn handle_cancel(&mut self, _params: Value) -> Result<Value> {
+    async fn handle_cancel(&self, _params: Value) -> McpResult<Value> {
         info!("❌ MCP operation cancelled by client");
         Ok(json!({}))
     }
 
     /// Handle initialized notification
-    async fn handle_initialized_notification(&mut self) -> Result<Value> {
+    async fn handle_initialized_notification(&self) -> McpResult<Value> {
         info!("✅ MCP client sent initialized notification");
         Ok(json!({}))
     }
 
     /// Handle logging notification
-    async fn handle_logging_notification(&mut self, params: Value) -> Result<Value> {
+    async fn handle_logging_notification(&self, params: Value) -> McpResult<Value> {
         let level = params
             .get("level")
             .and_then(|l| l.as_str())

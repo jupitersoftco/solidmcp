@@ -32,7 +32,7 @@ use super::{notification::NotificationCtx, providers::{ResourceProvider, PromptP
 /// - `NotificationCtx`: Context for sending notifications
 /// - Returns: `Pin<Box<dyn Future<Output = Result<Value>>>>` - Async result with JSON output
 pub type ToolFunction<C> = Box<
-    dyn Fn(Value, Arc<C>, NotificationCtx) -> Pin<Box<dyn Future<Output = anyhow::Result<Value>> + Send>>
+    dyn Fn(Value, Arc<C>, NotificationCtx) -> Pin<Box<dyn Future<Output = crate::error::McpResult<Value>> + Send>>
         + Send
         + Sync,
 >;

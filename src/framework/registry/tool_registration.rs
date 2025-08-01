@@ -8,7 +8,7 @@ use crate::{
     handler::ToolDefinition,
     typed_response::McpToolOutput,
 };
-use anyhow::Result;
+use crate::error::{McpError, McpResult};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::{future::Future, sync::Arc};
@@ -67,7 +67,7 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
     where
         I: JsonSchema + DeserializeOwned + Send + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<McpResponse>> + Send + 'static,
+        Fut: Future<Output = McpResult<McpResponse>> + Send + 'static,
     {
         let tool_def = ToolDefinition::from_schema::<I>(name, description);
         let handler = Arc::new(handler);
@@ -142,7 +142,7 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
         I: JsonSchema + DeserializeOwned + Send + 'static,
         O: JsonSchema + serde::Serialize + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O>> + Send + 'static,
+        Fut: Future<Output = McpResult<O>> + Send + 'static,
     {
         let tool_def = ToolDefinition::from_schemas::<I, O>(name, description);
         let handler = Arc::new(handler);
@@ -235,7 +235,7 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
         I: JsonSchema + DeserializeOwned + Send + 'static,
         O: McpToolOutput + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O>> + Send + 'static,
+        Fut: Future<Output = McpResult<O>> + Send + 'static,
     {
         // Generate tool definition with input and output schemas
         let mut tool_def = ToolDefinition::from_schema::<I>(name, description);

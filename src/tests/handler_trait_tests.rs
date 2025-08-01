@@ -6,7 +6,7 @@
 mod tests {
     use crate::handler::{McpContext, McpHandler, ToolDefinition};
     use crate::shared::McpProtocolEngine;
-    use anyhow::Result;
+    use crate::error::{McpError, McpResult};
     use async_trait::async_trait;
     use serde_json::{json, Value};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -29,10 +29,10 @@ mod tests {
 
     #[async_trait]
     impl McpHandler for MockHandler {
-        async fn initialize(&self, _params: Value, _context: &McpContext) -> Result<Value> {
+        async fn initialize(&self, _params: Value, _context: &McpContext) -> McpResult<Value> {
             let mut initialized = self.initialized.lock().await;
             if *initialized {
-                return Err(anyhow::anyhow!("Already initialized"));
+                return Err(McpError::AlreadyInitialized);
             }
             *initialized = true;
 
@@ -48,7 +48,7 @@ mod tests {
             }))
         }
 
-        async fn list_tools(&self, _context: &McpContext) -> Result<Vec<ToolDefinition>> {
+        async fn list_tools(&self, _context: &McpContext) -> McpResult<Vec<ToolDefinition>> {
             self.call_count.fetch_add(1, Ordering::Relaxed);
             Ok(vec![
                 ToolDefinition {
@@ -96,7 +96,7 @@ mod tests {
             name: &str,
             arguments: Value,
             _context: &McpContext,
-        ) -> Result<Value> {
+        ) -> McpResult<Value> {
             self.call_count.fetch_add(1, Ordering::Relaxed);
 
             match name {
@@ -105,8 +105,8 @@ mod tests {
                     "processed": "message",
                     "arguments": arguments
                 })),
-                "failing_tool" => Err(anyhow::anyhow!("Tool execution failed")),
-                _ => Err(anyhow::anyhow!("Tool '{}' not found", name)),
+                "failing_tool" => Err(McpError::Internal("Tool execution failed".to_string())),
+                _ => Err(McpError::UnknownTool(name.to_string())),
             }
         }
     }

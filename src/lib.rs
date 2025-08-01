@@ -6,6 +6,7 @@
 // Re-export the main modules
 pub mod content_types;
 pub mod core;
+pub mod error;
 pub mod framework;
 pub mod handler;
 pub mod handlers;
@@ -49,6 +50,9 @@ pub use framework::{FrameworkHandler, McpServerBuilder, PromptProvider, Resource
 
 // Re-export content types for type-safe MCP responses
 pub use content_types::{McpContent, McpResponse, ToMcpResponse};
+
+// Re-export error types
+pub use error::{McpError, McpResult, ProtocolError, TransportError};
 
 // Re-export WebSocket handler for convenience
 pub use websocket::handle_mcp_ws_main as handle_mcp_ws;

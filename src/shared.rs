@@ -39,11 +39,10 @@
 
 use {
     super::protocol_impl::McpProtocolHandlerImpl,
-    anyhow::Result,
+    crate::error::{McpError, McpResult},
+    dashmap::DashMap,
     serde_json::{json, Value},
-    std::collections::HashMap,
     std::sync::Arc,
-    tokio::sync::Mutex,
     tracing::{debug, trace},
 };
 
@@ -56,15 +55,16 @@ use {
 /// # Thread Safety
 ///
 /// The engine is thread-safe and can be shared across multiple connections using
-/// `Arc`. Session handlers are protected by a mutex to ensure safe concurrent access.
+/// `Arc`. Session handlers use DashMap for lock-free concurrent access.
 ///
 /// # Fields
 ///
-/// - `session_handlers`: Thread-safe map of session IDs to protocol handler instances
+/// - `session_handlers`: Lock-free concurrent map of session IDs to protocol handler instances
 /// - `handler`: Optional custom handler implementing the `McpHandler` trait
 pub struct McpProtocolEngine {
     // Maintain protocol handlers per session ID for proper client isolation
-    session_handlers: Arc<Mutex<HashMap<String, McpProtocolHandlerImpl>>>,
+    // Using DashMap for lock-free concurrent access
+    session_handlers: Arc<DashMap<String, Arc<McpProtocolHandlerImpl>>>,
     // Handler implementation for MCP functionality
     handler: Option<Arc<dyn super::handler::McpHandler>>,
 }
@@ -93,7 +93,7 @@ impl McpProtocolEngine {
     /// ```
     pub fn new() -> Self {
         Self {
-            session_handlers: Arc::new(Mutex::new(HashMap::new())),
+            session_handlers: Arc::new(DashMap::new()),
             handler: None,
         }
     }
@@ -123,7 +123,7 @@ impl McpProtocolEngine {
     pub fn with_handler(handler: Arc<dyn super::handler::McpHandler>) -> Self {
         debug!("Handler registered with MCP protocol engine");
         Self {
-            session_handlers: Arc::new(Mutex::new(HashMap::new())),
+            session_handlers: Arc::new(DashMap::new()),
             handler: Some(handler),
         }
     }
@@ -179,8 +179,10 @@ impl McpProtocolEngine {
         &self,
         message: Value,
         session_id: Option<String>, // Session ID for client isolation
-    ) -> Result<Value> {
-        let method = message["method"].as_str().unwrap_or("");
+    ) -> McpResult<Value> {
+        let method = message["method"]
+            .as_str()
+            .ok_or_else(|| McpError::InvalidParams("Missing method field".to_string()))?;
         trace!(
             "Processing MCP method: {} (session: {:?})",
             method,
@@ -188,16 +190,20 @@ impl McpProtocolEngine {
         );
 
         // Get or create protocol handler for this session
-        let mut sessions = self.session_handlers.lock().await;
         let session_key = session_id
             .as_ref()
             .unwrap_or(&"default".to_string())
             .clone();
 
-        let protocol_handler = sessions.entry(session_key.clone()).or_insert_with(|| {
-            trace!("Creating new protocol handler for session: {}", session_key);
-            McpProtocolHandlerImpl::new()
-        });
+        // Get or create protocol handler for this session
+        // We clone the Arc to get a reference we can use across await points
+        let handler = self.session_handlers
+            .entry(session_key.clone())
+            .or_insert_with(|| {
+                trace!("Creating new protocol handler for session: {}", session_key);
+                Arc::new(McpProtocolHandlerImpl::new())
+            })
+            .clone();
 
         // If we have a custom handler, delegate to it for supported methods
         if let Some(ref custom_handler) = self.handler {
@@ -222,17 +228,19 @@ impl McpProtocolEngine {
                     // in server.rs returns a static response anyway
 
                     // Check if already initialized
-                    if protocol_handler.initialized {
+                    if handler.initialized.load(std::sync::atomic::Ordering::Relaxed) {
                         // For HTTP clients that may reconnect, allow re-initialization
                         // This is especially important for MCP clients like Cursor that may
                         // create multiple connections or reconnect frequently
                         debug!("Session {} already initialized, allowing re-initialization for HTTP client", session_key);
 
-                        // Create a fresh protocol handler to ensure clean state
-                        *protocol_handler = McpProtocolHandlerImpl::new();
+                        // Reset the protocol handler state to ensure clean state
+                        handler.initialized.store(false, std::sync::atomic::Ordering::Relaxed);
+                        *handler.client_info.write().await = None;
+                        *handler.protocol_version.write().await = None;
 
                         debug!(
-                            "Created fresh protocol handler for session {} re-initialization",
+                            "Reset protocol handler state for session {} re-initialization",
                             session_key
                         );
                     }
@@ -240,13 +248,13 @@ impl McpProtocolEngine {
                     match custom_handler.initialize(params, &context).await {
                         Ok(result) => {
                             // Mark session as initialized in the protocol handler
-                            protocol_handler.initialized = true;
+                            handler.initialized.store(true, std::sync::atomic::Ordering::Relaxed);
                             if let Some(client_version) = message
                                 .get("params")
                                 .and_then(|p| p.get("protocolVersion"))
                                 .and_then(|v| v.as_str())
                             {
-                                protocol_handler.protocol_version =
+                                *handler.protocol_version.write().await =
                                     Some(client_version.to_string());
                             }
 
@@ -258,7 +266,7 @@ impl McpProtocolEngine {
                             return Ok(response);
                         }
                         Err(e) => {
-                            return Err(anyhow::anyhow!("Initialize error: {}", e));
+                            return Err(e);
                         }
                     }
                 }
@@ -286,7 +294,7 @@ impl McpProtocolEngine {
                         return Ok(response);
                     }
                     Err(e) => {
-                        return Err(anyhow::anyhow!("Tools list error: {}", e));
+                        return Err(e);
                     }
                 },
                 "tools/call" => {
@@ -308,7 +316,7 @@ impl McpProtocolEngine {
                                 return Ok(response);
                             }
                             Err(e) => {
-                                return Err(anyhow::anyhow!("Tool call error: {}", e));
+                                return Err(e);
                             }
                         }
                     }
@@ -342,7 +350,7 @@ impl McpProtocolEngine {
                         return Ok(response);
                     }
                     Err(e) => {
-                        return Err(anyhow::anyhow!("Resources list error: {}", e));
+                        return Err(e);
                     }
                 },
                 "resources/read" => {
@@ -366,7 +374,7 @@ impl McpProtocolEngine {
                                 return Ok(response);
                             }
                             Err(e) => {
-                                return Err(anyhow::anyhow!("Resource read error: {}", e));
+                                return Err(e);
                             }
                         }
                     }
@@ -414,7 +422,7 @@ impl McpProtocolEngine {
                         return Ok(response);
                     }
                     Err(e) => {
-                        return Err(anyhow::anyhow!("Prompts list error: {}", e));
+                        return Err(e);
                     }
                 },
                 "prompts/get" => {
@@ -447,7 +455,7 @@ impl McpProtocolEngine {
                                 return Ok(response);
                             }
                             Err(e) => {
-                                return Err(anyhow::anyhow!("Prompt get error: {}", e));
+                                return Err(e);
                             }
                         }
                     }
@@ -461,11 +469,11 @@ impl McpProtocolEngine {
         }
 
         // Fall back to built-in protocol handler
-        protocol_handler.handle_message(message).await
+        handler.handle_message(message).await
     }
 
     /// Create an error response following JSON-RPC 2.0 format
-    fn _create_error_response(&self, id: Option<Value>, code: i32, message: &str) -> Result<Value> {
+    fn _create_error_response(&self, id: Option<Value>, code: i32, message: &str) -> McpResult<Value> {
         Ok(json!({
             "jsonrpc": "2.0",
             "id": id.unwrap_or(Value::Null),

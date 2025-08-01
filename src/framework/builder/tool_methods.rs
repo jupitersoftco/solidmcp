@@ -81,7 +81,7 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
         I: JsonSchema + DeserializeOwned + Send + 'static,
         O: Serialize + JsonSchema + Send + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O>> + Send + 'static,
+        Fut: Future<Output = crate::error::McpResult<O>> + Send + 'static,
     {
         use crate::tool_response::IntoToolResponse;
         
@@ -159,7 +159,7 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
         I: JsonSchema + DeserializeOwned + Send + 'static,
         O: JsonSchema + serde::Serialize + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O>> + Send + 'static,
+        Fut: Future<Output = crate::error::McpResult<O>> + Send + 'static,
     {
         self.handler
             .registry_mut()
@@ -219,7 +219,7 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
         I: JsonSchema + DeserializeOwned + Send + 'static,
         O: IntoToolResponse + JsonSchema + serde::Serialize + 'static,
         F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O>> + Send + 'static,
+        Fut: Future<Output = crate::error::McpResult<O>> + Send + 'static,
     {
         let handler = Arc::new(handler);
         

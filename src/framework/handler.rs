@@ -8,7 +8,7 @@ use crate::handler::{
     McpContext, McpHandler, PromptContent, PromptInfo, ResourceContent, ResourceInfo,
     ToolDefinition,
 };
-use anyhow::Result;
+use crate::error::{McpError, McpResult};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
@@ -90,7 +90,7 @@ impl<C: Send + Sync + 'static> FrameworkHandler<C> {
 
 #[async_trait]
 impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
-    async fn initialize(&self, _params: Value, _context: &McpContext) -> Result<Value> {
+    async fn initialize(&self, _params: Value, _context: &McpContext) -> McpResult<Value> {
         Ok(serde_json::json!({
             "protocolVersion": "2025-06-18",
             "capabilities": {
@@ -105,7 +105,7 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
         }))
     }
 
-    async fn list_tools(&self, _context: &McpContext) -> Result<Vec<ToolDefinition>> {
+    async fn list_tools(&self, _context: &McpContext) -> McpResult<Vec<ToolDefinition>> {
         Ok(self
             .registry
             .tools
@@ -114,16 +114,16 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
             .collect())
     }
 
-    async fn call_tool(&self, name: &str, arguments: Value, context: &McpContext) -> Result<Value> {
+    async fn call_tool(&self, name: &str, arguments: Value, context: &McpContext) -> McpResult<Value> {
         if let Some((_, tool_fn)) = self.registry.tools.get(name) {
             let notification_ctx = NotificationCtx::from_mcp(context);
             tool_fn(arguments, self.context.clone(), notification_ctx).await
         } else {
-            Err(anyhow::anyhow!("Tool not found: {}", name))
+            Err(McpError::UnknownTool(name.to_string()))
         }
     }
 
-    async fn list_resources(&self, _context: &McpContext) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: &McpContext) -> McpResult<Vec<ResourceInfo>> {
         let mut all_resources = Vec::new();
         for provider in &self.registry.resources {
             let mut resources = provider.list_resources(self.context.clone()).await?;
@@ -132,16 +132,16 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
         Ok(all_resources)
     }
 
-    async fn read_resource(&self, uri: &str, _context: &McpContext) -> Result<ResourceContent> {
+    async fn read_resource(&self, uri: &str, _context: &McpContext) -> McpResult<ResourceContent> {
         for provider in &self.registry.resources {
             if let Ok(content) = provider.read_resource(uri, self.context.clone()).await {
                 return Ok(content);
             }
         }
-        Err(anyhow::anyhow!("Resource not found: {}", uri))
+        Err(McpError::UnknownResource(uri.to_string()))
     }
 
-    async fn list_prompts(&self, _context: &McpContext) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, _context: &McpContext) -> McpResult<Vec<PromptInfo>> {
         let mut all_prompts = Vec::new();
         for provider in &self.registry.prompts {
             let mut prompts = provider.list_prompts(self.context.clone()).await?;
@@ -155,7 +155,7 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
         name: &str,
         arguments: Option<Value>,
         _context: &McpContext,
-    ) -> Result<PromptContent> {
+    ) -> McpResult<PromptContent> {
         for provider in &self.registry.prompts {
             if let Ok(content) = provider
                 .get_prompt(name, arguments.clone(), self.context.clone())
@@ -164,6 +164,6 @@ impl<C: Send + Sync + 'static> McpHandler for FrameworkHandler<C> {
                 return Ok(content);
             }
         }
-        Err(anyhow::anyhow!("Prompt not found: {}", name))
+        Err(McpError::UnknownPrompt(name.to_string()))
     }
 }

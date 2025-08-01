@@ -6,7 +6,7 @@ use {
     super::logging::McpConnectionId,
     super::logging::McpDebugLogger,
     super::shared::McpProtocolEngine,
-    anyhow::Result,
+    crate::error::McpError,
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
     std::sync::Arc,
@@ -115,17 +115,10 @@ async fn handle_mcp_ws(
 
                                     // Extract the message ID from the original request for proper error response
                                     let message_id =
-                                        message.get("id").unwrap_or(&json!(null)).clone();
+                                        message.get("id").cloned();
 
-                                    // Create error response
-                                    let error_response = json!({
-                                        "jsonrpc": "2.0",
-                                        "id": message_id,
-                                        "error": {
-                                            "code": -32603,
-                                            "message": format!("Internal error: {}", e)
-                                        }
-                                    });
+                                    // Create error response using structured error types
+                                    let error_response = e.to_json_rpc_error(message_id);
 
                                     let error_text = match serde_json::to_string(&error_response) {
                                         Ok(text) => text,

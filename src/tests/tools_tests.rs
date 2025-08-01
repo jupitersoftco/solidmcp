@@ -164,6 +164,6 @@ async fn test_mcp_unknown_tool() {
     assert_eq!(response["id"], 4);
     assert!(response["error"].is_object());
     let error_message = response["error"]["message"].as_str().unwrap();
-    // Unknown tool errors are mapped to "Method not found" per JSON-RPC standards
-    assert!(error_message.contains("Method not found"));
+    // Unknown tool errors should contain tool name or "Tool not found"
+    assert!(error_message.contains("Tool not found") || error_message.contains("unknown_tool"));
 }

@@ -4,7 +4,7 @@
 //! providers that can be registered with the MCP framework.
 
 use crate::handler::{PromptContent, PromptInfo, ResourceContent, ResourceInfo};
-use anyhow::Result;
+use crate::error::{McpError, McpResult};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
@@ -49,7 +49,7 @@ use std::sync::Arc;
 ///                     content: serde_json::to_string_pretty(&users)?,
 ///                 })
 ///             }
-///             _ => Err(anyhow::anyhow!("Resource not found: {}", uri))
+///             _ => Err(McpError::UnknownResource(uri.to_string()))
 ///         }
 ///     }
 /// }
@@ -63,7 +63,7 @@ pub trait ResourceProvider<C>: Send + Sync {
     ///
     /// # Returns
     /// `Result<Vec<ResourceInfo>>` - List of available resources or an error
-    async fn list_resources(&self, context: Arc<C>) -> Result<Vec<ResourceInfo>>;
+    async fn list_resources(&self, context: Arc<C>) -> McpResult<Vec<ResourceInfo>>;
 
     /// Read the content of a specific resource identified by URI.
     ///
@@ -73,7 +73,7 @@ pub trait ResourceProvider<C>: Send + Sync {
     ///
     /// # Returns
     /// `Result<ResourceContent>` - The resource content or an error if not found
-    async fn read_resource(&self, uri: &str, context: Arc<C>) -> Result<ResourceContent>;
+    async fn read_resource(&self, uri: &str, context: Arc<C>) -> McpResult<ResourceContent>;
 }
 
 /// Trait for providing dynamic prompt templates to MCP clients.
@@ -91,7 +91,7 @@ pub trait ResourceProvider<C>: Send + Sync {
 ///
 /// #[async_trait]
 /// impl PromptProvider<AppContext> for TemplateProvider {
-///     async fn list_prompts(&self, context: Arc<AppContext>) -> Result<Vec<PromptInfo>> {
+///     async fn list_prompts(&self, context: Arc<AppContext>) -> McpResult<Vec<PromptInfo>> {
 ///         Ok(vec![
 ///             PromptInfo {
 ///                 name: "code_review".to_string(),
@@ -112,7 +112,7 @@ pub trait ResourceProvider<C>: Send + Sync {
 ///         ])
 ///     }
 ///
-///     async fn get_prompt(&self, name: &str, arguments: Option<Value>, context: Arc<AppContext>) -> Result<PromptContent> {
+///     async fn get_prompt(&self, name: &str, arguments: Option<Value>, context: Arc<AppContext>) -> McpResult<PromptContent> {
 ///         match name {
 ///             "code_review" => {
 ///                 let args: serde_json::Map<String, Value> = arguments
@@ -121,7 +121,7 @@ pub trait ResourceProvider<C>: Send + Sync {
 ///                 
 ///                 let code = args.get("code")
 ///                     .and_then(|v| v.as_str())
-///                     .ok_or_else(|| anyhow::anyhow!("Missing required argument: code"))?;
+///                     .ok_or_else(|| McpError::InvalidParams("Missing required argument: code".to_string()))?;
 ///                 
 ///                 let language = args.get("language")
 ///                     .and_then(|v| v.as_str())
@@ -136,7 +136,7 @@ pub trait ResourceProvider<C>: Send + Sync {
 ///                     ],
 ///                 })
 ///             }
-///             _ => Err(anyhow::anyhow!("Prompt not found: {}", name))
+///             _ => Err(McpError::UnknownPrompt(name.to_string()))
 ///         }
 ///     }
 /// }
@@ -150,7 +150,7 @@ pub trait PromptProvider<C>: Send + Sync {
     ///
     /// # Returns
     /// `Result<Vec<PromptInfo>>` - List of available prompts or an error
-    async fn list_prompts(&self, context: Arc<C>) -> Result<Vec<PromptInfo>>;
+    async fn list_prompts(&self, context: Arc<C>) -> McpResult<Vec<PromptInfo>>;
 
     /// Generate prompt content for a specific template with given arguments.
     ///
@@ -166,5 +166,5 @@ pub trait PromptProvider<C>: Send + Sync {
         name: &str,
         arguments: Option<Value>,
         context: Arc<C>,
-    ) -> Result<PromptContent>;
+    ) -> McpResult<PromptContent>;
 }

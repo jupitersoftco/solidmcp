@@ -3,7 +3,8 @@
 **Priority**: 🟡 HIGH  
 **Effort**: 4 hours  
 **Dependencies**: TODO-016 (need limits in place first)  
-**Category**: Performance, Scalability
+**Category**: Performance, Scalability  
+**Status**: ✅ COMPLETED (2025-08-01)
 
 ## 📋 Description
 
@@ -11,11 +12,11 @@ Replace the global `Arc<Mutex<HashMap<String, Session>>>` with DashMap for lock-
 
 ## 🎯 Acceptance Criteria
 
-- [ ] DashMap replaces Mutex<HashMap> for sessions
-- [ ] No more global lock contention
-- [ ] All existing tests pass
-- [ ] Concurrent session operations verified
-- [ ] No race conditions introduced
+- [x] DashMap replaces Mutex<HashMap> for sessions
+- [x] No more global lock contention
+- [x] All existing tests pass (137 library tests)
+- [x] Concurrent session operations verified
+- [x] No race conditions introduced
 
 ## 📊 Current State
 
@@ -239,3 +240,32 @@ async fn test_no_lock_contention() {
 - No need for read/write locks - all operations are atomic
 - Consider adding metrics for lock contention (before/after)
 - May want to add session pooling later for even better performance
+
+## ✅ Completion Summary (2025-08-01)
+
+Successfully replaced the global session mutex with DashMap for lock-free concurrent access:
+
+1. **Added DashMap dependency** (v5.5)
+
+2. **Updated McpProtocolEngine**:
+   - Replaced `Arc<Mutex<HashMap<String, McpProtocolHandlerImpl>>>` with `Arc<DashMap<String, Arc<McpProtocolHandlerImpl>>>`
+   - Used DashMap's entry API for atomic get-or-create operations
+   - Wrapped handlers in Arc for safe sharing across await points
+
+3. **Made McpProtocolHandlerImpl thread-safe**:
+   - Changed `initialized: bool` to `AtomicBool`
+   - Changed `client_info: Option<Value>` to `RwLock<Option<Value>>`
+   - Changed `protocol_version: Option<String>` to `RwLock<Option<String>>`
+   - Updated all methods to use `&self` instead of `&mut self`
+
+4. **Updated all access patterns**:
+   - No more global lock - each session operation is atomic
+   - Sessions can be accessed concurrently without blocking
+   - Re-initialization logic preserved for HTTP clients
+
+5. **Testing**:
+   - All 137 library tests pass
+   - Session management works correctly
+   - No race conditions detected
+
+This change eliminates the major scalability bottleneck where all session operations were serialized through a single mutex. Now sessions can be accessed and modified concurrently, significantly improving performance under load.
