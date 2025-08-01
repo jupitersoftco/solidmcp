@@ -111,7 +111,7 @@ where
     S: StreamExt<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin,
 {
     match timeout(timeout_duration, read.next()).await {
-        Ok(Some(Ok(Message::Text(text)))) => Ok(text),
+        Ok(Some(Ok(Message::Text(text)))) => Ok(text.to_string()),
         Ok(Some(Ok(msg))) => Err(anyhow::anyhow!("Unexpected message type: {:?}", msg)),
         Ok(Some(Err(e))) => Err(e.into()),
         Ok(None) => Err(anyhow::anyhow!("Stream closed")),
@@ -165,7 +165,7 @@ async fn test_websocket_basic_flow() -> Result<()> {
         }
     });
 
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
 
@@ -187,13 +187,13 @@ async fn test_websocket_basic_flow() -> Result<()> {
     });
 
     write
-        .send(Message::Text(add_note_request.to_string()))
+        .send(Message::Text(add_note_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
-
-    assert_eq!(parsed["result"]["success"], true);
-    assert!(parsed["result"]["message"]
+    
+    assert_eq!(parsed["result"]["data"]["success"], true);
+    assert!(parsed["result"]["data"]["message"]
         .as_str()
         .unwrap()
         .contains("test"));
@@ -217,7 +217,7 @@ async fn test_list_tools() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // List tools
@@ -228,7 +228,7 @@ async fn test_list_tools() -> Result<()> {
     });
 
     write
-        .send(Message::Text(list_tools_request.to_string()))
+        .send(Message::Text(list_tools_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -261,7 +261,7 @@ async fn test_note_persistence() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Add a note
@@ -279,7 +279,7 @@ async fn test_note_persistence() -> Result<()> {
     });
 
     write
-        .send(Message::Text(add_note_request.to_string()))
+        .send(Message::Text(add_note_request.to_string().into()))
         .await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
@@ -308,7 +308,7 @@ async fn test_list_resources() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Add a test note first
@@ -326,7 +326,7 @@ async fn test_list_resources() -> Result<()> {
     });
 
     write
-        .send(Message::Text(add_note_request.to_string()))
+        .send(Message::Text(add_note_request.to_string().into()))
         .await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
@@ -338,7 +338,7 @@ async fn test_list_resources() -> Result<()> {
     });
 
     write
-        .send(Message::Text(list_resources_request.to_string()))
+        .send(Message::Text(list_resources_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -373,7 +373,7 @@ async fn test_read_resource() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Add a test note
@@ -392,7 +392,7 @@ async fn test_read_resource() -> Result<()> {
     });
 
     write
-        .send(Message::Text(add_note_request.to_string()))
+        .send(Message::Text(add_note_request.to_string().into()))
         .await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
@@ -407,7 +407,7 @@ async fn test_read_resource() -> Result<()> {
     });
 
     write
-        .send(Message::Text(read_resource_request.to_string()))
+        .send(Message::Text(read_resource_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -439,7 +439,7 @@ async fn test_resource_not_found() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Try to read a non-existent resource
@@ -453,7 +453,7 @@ async fn test_resource_not_found() -> Result<()> {
     });
 
     write
-        .send(Message::Text(read_resource_request.to_string()))
+        .send(Message::Text(read_resource_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -483,7 +483,7 @@ async fn test_list_prompts() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // List prompts
@@ -494,7 +494,7 @@ async fn test_list_prompts() -> Result<()> {
     });
 
     write
-        .send(Message::Text(list_prompts_request.to_string()))
+        .send(Message::Text(list_prompts_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -546,7 +546,7 @@ async fn test_get_meeting_notes_prompt() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Get meeting_notes prompt with arguments
@@ -564,7 +564,7 @@ async fn test_get_meeting_notes_prompt() -> Result<()> {
     });
 
     write
-        .send(Message::Text(get_prompt_request.to_string()))
+        .send(Message::Text(get_prompt_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -600,7 +600,7 @@ async fn test_get_task_note_prompt() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Get task_note prompt with arguments
@@ -619,7 +619,7 @@ async fn test_get_task_note_prompt() -> Result<()> {
     });
 
     write
-        .send(Message::Text(get_prompt_request.to_string()))
+        .send(Message::Text(get_prompt_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -656,7 +656,7 @@ async fn test_get_daily_journal_prompt() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Get daily_journal prompt with custom date
@@ -673,7 +673,7 @@ async fn test_get_daily_journal_prompt() -> Result<()> {
     });
 
     write
-        .send(Message::Text(get_prompt_request.to_string()))
+        .send(Message::Text(get_prompt_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -709,7 +709,7 @@ async fn test_get_daily_journal_prompt_default_date() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Get daily_journal prompt without date (should use today)
@@ -724,7 +724,7 @@ async fn test_get_daily_journal_prompt_default_date() -> Result<()> {
     });
 
     write
-        .send(Message::Text(get_prompt_request.to_string()))
+        .send(Message::Text(get_prompt_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
@@ -759,7 +759,7 @@ async fn test_get_nonexistent_prompt() -> Result<()> {
         "method": "initialize",
         "params": {}
     });
-    write.send(Message::Text(init_request.to_string())).await?;
+    write.send(Message::Text(init_request.to_string().into())).await?;
     receive_ws_message(&mut read, Duration::from_secs(5)).await?;
 
     // Try to get a non-existent prompt
@@ -774,7 +774,7 @@ async fn test_get_nonexistent_prompt() -> Result<()> {
     });
 
     write
-        .send(Message::Text(get_prompt_request.to_string()))
+        .send(Message::Text(get_prompt_request.to_string().into()))
         .await?;
     let response = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
     let parsed: Value = serde_json::from_str(&response)?;
