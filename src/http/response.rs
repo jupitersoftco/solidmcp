@@ -6,7 +6,7 @@ use crate::error::McpError;
 use serde_json::{json, Value};
 use tracing::debug;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
-use warp::reply::{self, Response};
+use warp::reply;
 use warp::Reply;
 
 /// Builder for HTTP responses

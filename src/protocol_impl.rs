@@ -170,7 +170,7 @@ impl McpProtocolHandlerImpl {
                 // TODO: Implement resources/list
                 Ok(json!({ "resources": [] }))
             }
-            ParsedMessage::ResourcesRead(params) => {
+            ParsedMessage::ResourcesRead(_params) => {
                 self.ensure_initialized()?;
                 // TODO: Implement resources/read
                 Err(McpError::Internal("Resource read not implemented".into()))
@@ -180,7 +180,7 @@ impl McpProtocolHandlerImpl {
                 // TODO: Implement prompts/list
                 Ok(json!({ "prompts": [] }))
             }
-            ParsedMessage::PromptsGet(params) => {
+            ParsedMessage::PromptsGet(_params) => {
                 self.ensure_initialized()?;
                 // TODO: Implement prompts/get
                 Err(McpError::Internal("Prompt get not implemented".into()))

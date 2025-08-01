@@ -4,7 +4,7 @@
 //! providers that can be registered with the MCP framework.
 
 use crate::handler::{PromptContent, PromptInfo, ResourceContent, ResourceInfo};
-use crate::error::{McpError, McpResult};
+use crate::error::McpResult;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;

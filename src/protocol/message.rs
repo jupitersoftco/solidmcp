@@ -94,32 +94,27 @@ pub struct NotificationMessage {
 
 /// Pre-computed schema for InitializeParams
 static INITIALIZE_PARAMS_SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
-    let root_schema = schemars::schema_for!(InitializeParams);
-    root_schema.schema
+    schemars::schema_for!(InitializeParams)
 });
 
 /// Pre-computed schema for ToolCallParams  
 static TOOL_CALL_PARAMS_SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
-    let root_schema = schemars::schema_for!(ToolCallParams);
-    root_schema.schema
+    schemars::schema_for!(ToolCallParams)
 });
 
 /// Pre-computed schema for ResourceReadParams
 static RESOURCE_READ_PARAMS_SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
-    let root_schema = schemars::schema_for!(ResourceReadParams);
-    root_schema.schema
+    schemars::schema_for!(ResourceReadParams)
 });
 
 /// Pre-computed schema for PromptGetParams
 static PROMPT_GET_PARAMS_SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
-    let root_schema = schemars::schema_for!(PromptGetParams);
-    root_schema.schema
+    schemars::schema_for!(PromptGetParams)
 });
 
 /// Pre-computed schema for NotificationMessage
 static NOTIFICATION_MESSAGE_SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
-    let root_schema = schemars::schema_for!(NotificationMessage);
-    root_schema.schema
+    schemars::schema_for!(NotificationMessage)
 });
 
 /// Get the schema for a given message type
@@ -136,8 +131,7 @@ pub fn get_message_schema(message_type: &ParsedMessage) -> &'static Schema {
             // These don't have parameters, so no schema needed
             // Return a minimal empty schema
             static EMPTY_SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
-                let root_schema = schemars::schema_for!(());
-                root_schema.schema
+                schemars::schema_for!(())
             });
             &EMPTY_SCHEMA
         }
@@ -501,7 +495,7 @@ mod tests {
         let schema = get_message_schema(&parsed);
         
         // Schema should be properly structured
-        assert!(schema.schema.object.is_some());
+        assert!(schema.object.is_some());
         
         // Test that different message types get different schemas
         let init_msg = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":null}}"#;
@@ -513,8 +507,8 @@ mod tests {
         
         // Different message types should have different schemas
         // We can't directly compare RootSchema for inequality, so test different aspects
-        assert!(init_schema.schema.object.is_some());
-        assert!(tool_schema.schema.object.is_some());
+        assert!(init_schema.object.is_some());
+        assert!(tool_schema.object.is_some());
         
         // Both should be valid schemas but for different types
         match (&init_parsed, &parsed) {
@@ -543,7 +537,7 @@ mod tests {
         assert!(std::ptr::eq(schema1, schema2));
         
         // Schema should be valid
-        assert!(schema1.schema.object.is_some());
+        assert!(schema1.object.is_some());
     }
 
     #[test]
@@ -569,7 +563,7 @@ mod tests {
             
             // Every message type should have a schema
             let schema = get_message_schema(&parsed);
-            assert!(schema.schema.object.is_some() || schema.schema.boolean.is_some(), 
+            assert!(schema.object.is_some() || schema.boolean.is_some(), 
                    "No schema available for message type: {}", expected_type);
         }
     }

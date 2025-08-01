@@ -199,49 +199,6 @@ impl McpResponse {
     }
 }
 
-/// Helper trait for converting types to MCP responses
-///
-/// This trait provides a convenient way to convert common types into
-/// MCP-compliant responses without manual wrapping.
-pub trait ToMcpResponse {
-    /// Convert this type into an MCP response
-    fn to_mcp_response(self) -> McpResponse;
-}
-
-impl ToMcpResponse for String {
-    fn to_mcp_response(self) -> McpResponse {
-        McpResponse::text(self)
-    }
-}
-
-impl ToMcpResponse for &str {
-    fn to_mcp_response(self) -> McpResponse {
-        McpResponse::text(self)
-    }
-}
-
-impl ToMcpResponse for Value {
-    fn to_mcp_response(self) -> McpResponse {
-        // Try to extract a reasonable text summary from the JSON
-        let text = if let Some(message) = self.get("message").and_then(|v| v.as_str()) {
-            message.to_string()
-        } else if let Some(status) = self.get("status").and_then(|v| v.as_str()) {
-            status.to_string()
-        } else if let Some(results) = self.get("results").and_then(|v| v.as_array()) {
-            format!("Operation completed with {} results", results.len())
-        } else {
-            "Operation completed".to_string()
-        };
-        
-        McpResponse::with_text_and_data(text, self)
-    }
-}
-
-impl ToMcpResponse for McpResponse {
-    fn to_mcp_response(self) -> McpResponse {
-        self
-    }
-}
 
 #[cfg(test)]
 mod tests {

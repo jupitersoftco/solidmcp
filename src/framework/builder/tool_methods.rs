@@ -7,7 +7,6 @@ use crate::{
     handler::ToolDefinition,
     tool_response::IntoToolResponse,
 };
-use anyhow::Result;
 use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{future::Future, sync::Arc};

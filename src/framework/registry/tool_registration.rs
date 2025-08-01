@@ -8,7 +8,7 @@ use crate::{
     handler::ToolDefinition,
     typed_response::McpToolOutput,
 };
-use crate::error::{McpError, McpResult};
+use crate::error::McpResult;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::{future::Future, sync::Arc};
@@ -165,117 +165,4 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
         self.tools.insert(name.to_string(), (tool_def, wrapper));
     }
 
-    /// Register a tool with enforced typed output.
-    ///
-    /// This method ensures maximum type safety by requiring:
-    /// 1. Input type with JSON schema (for validation)
-    /// 2. Output type that implements `McpToolOutput` (for rich context)
-    /// 3. Automatic schema registration for both input and output
-    ///
-    /// This is the recommended way to register tools as it provides the richest
-    /// context to LLMs and prevents common errors like returning raw JSON.
-    ///
-    /// # Type Parameters
-    /// - `I`: Input type (must implement `JsonSchema` and `DeserializeOwned`)
-    /// - `O`: Output type (must implement `McpToolOutput`)
-    /// - `F`: Handler function type
-    /// - `Fut`: Future returned by the handler function
-    ///
-    /// # Parameters
-    /// - `name`: Unique name for the tool
-    /// - `description`: Human-readable description of what the tool does
-    /// - `handler`: Async function that takes typed input and returns typed output
-    ///
-    /// # Examples
-    /// ```rust
-    /// use solidmcp::typed_response::McpToolOutput;
-    /// use schemars::JsonSchema;
-    /// use serde::{Deserialize, Serialize};
-    ///
-    /// #[derive(JsonSchema, Deserialize)]
-    /// struct SearchInput {
-    ///     query: String,
-    ///     limit: Option<u32>,
-    /// }
-    ///
-    /// #[derive(Debug, Serialize, JsonSchema)]
-    /// struct SearchOutput {
-    ///     query: String,
-    ///     results: Vec<SearchResult>,
-    ///     total_count: usize,
-    /// }
-    ///
-    /// impl McpToolOutput for SearchOutput {
-    ///     fn to_mcp_response(&self) -> McpResponse {
-    ///         let summary = format!("Found {} results for '{}'", self.total_count, self.query);
-    ///         McpResponse::with_text_and_data(summary, serde_json::to_value(self).unwrap())
-    ///     }
-    ///     
-    ///     fn output_schema() -> OutputSchema {
-    ///         OutputSchema {
-    ///             name: "SearchOutput",
-    ///             description: "Search results with metadata",
-    ///             schema: Self::json_schema(),
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// registry.register_typed_tool("search", "Search the knowledge base", |input: SearchInput, ctx, notif| async move {
-    ///     let results = ctx.search_engine.search(&input.query).await?;
-    ///     
-    ///     Ok(SearchOutput {
-    ///         query: input.query,
-    ///         total_count: results.len(),
-    ///         results,
-    ///     })
-    /// });
-    /// ```
-    pub fn register_typed_tool<I, O, F, Fut>(&mut self, name: &str, description: &str, handler: F)
-    where
-        I: JsonSchema + DeserializeOwned + Send + 'static,
-        O: McpToolOutput + 'static,
-        F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = McpResult<O>> + Send + 'static,
-    {
-        // Generate tool definition with input and output schemas
-        let mut tool_def = ToolDefinition::from_schema::<I>(name, description);
-        
-        // Store the output schema for discovery
-        let output_schema = O::output_schema();
-        let output_schema_desc = output_schema.description.to_string();
-        self.output_schemas.insert(name.to_string(), output_schema);
-        
-        // Add output schema info to tool definition if possible
-        // This helps LLMs understand what the tool returns
-        if let Some(obj) = tool_def.input_schema.as_object() {
-            let mut modified_schema = obj.clone();
-            modified_schema.insert("_output_schema".to_string(), serde_json::json!({
-                "description": output_schema_desc,
-                "type": "object"
-            }));
-            tool_def.input_schema = serde_json::Value::Object(modified_schema);
-        }
-        
-        let handler = Arc::new(handler);
-
-        let wrapper: ToolFunction<C> = Box::new(move |args, context, notification_ctx| {
-            let handler = Arc::clone(&handler);
-
-            Box::pin(async move {
-                // Parse and validate input
-                let input: I = serde_json::from_value(args)?;
-
-                // Call the handler to get typed output
-                let output = handler(input, context, notification_ctx).await?;
-
-                // Convert to MCP response using the trait method
-                let mcp_response = output.to_mcp_response();
-
-                // Return as JSON value for protocol compatibility
-                Ok(serde_json::to_value(mcp_response)?)
-            })
-        });
-
-        self.tools.insert(name.to_string(), (tool_def, wrapper));
-    }
 }

@@ -76,16 +76,6 @@ impl<C: Send + Sync + 'static> FrameworkHandler<C> {
         &mut self.registry
     }
 
-    /// Get a shared reference to the application context.
-    ///
-    /// This provides access to the application context that will be passed to
-    /// all tool handlers. Useful for accessing shared state or configuration.
-    ///
-    /// # Returns
-    /// Shared reference to the application context
-    pub fn context(&self) -> &Arc<C> {
-        &self.context
-    }
 }
 
 #[async_trait]

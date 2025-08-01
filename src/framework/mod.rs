@@ -66,15 +66,5 @@ pub mod registry;
 
 // Re-export main types
 pub use builder::McpServerBuilder;
-pub use handler::FrameworkHandler;
-pub use notification::{
-    notify_prompts_changed, notify_resources_changed, notify_tools_changed, send_notification,
-    NotificationCtx,
-};
+pub use notification::NotificationCtx;
 pub use providers::{PromptProvider, ResourceProvider};
-
-// Re-export the registry for advanced users who might need it
-pub use registry::ToolRegistry;
-
-// Re-export helper functions at the module level for backward compatibility
-pub use notification::send_notification as send_notification_helper;

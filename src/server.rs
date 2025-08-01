@@ -4,7 +4,6 @@
 
 use {
     super::http_handler::HttpMcpHandler,
-    super::logging::McpDebugLogger,
     super::protocol::McpProtocol,
     super::shared::McpProtocolEngine,
     anyhow::{Context, Result},

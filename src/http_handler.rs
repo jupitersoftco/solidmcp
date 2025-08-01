@@ -224,7 +224,7 @@ async fn handle_mcp_http_impl(
     
     // Process the message
     let process_start = Instant::now();
-    let progress_sender = progress_handler.as_ref().map(|h| h.sender());
+    let _progress_sender = progress_handler.as_ref().map(|h| h.sender());
     
     // For now, we don't pass the progress sender to maintain compatibility
     let result = handler.handle_message(

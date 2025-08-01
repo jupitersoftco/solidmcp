@@ -122,5 +122,4 @@ pub struct ResourceInfo {
     pub mime_type: Option<String>,
 }
 
-// Re-export from handler module for backward compatibility
-pub use crate::handler::{LogLevel, McpContext, McpNotification, TypedToolDefinition};
+// Essential handler types are re-exported through the main lib.rs
