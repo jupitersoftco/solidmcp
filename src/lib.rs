@@ -11,6 +11,7 @@ pub mod framework;
 pub mod handler;
 pub mod handlers;
 pub mod http;
+pub mod http_handler;
 pub mod logging;
 pub mod protocol;
 pub mod protocol_impl;

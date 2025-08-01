@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::http::HttpMcpHandler;
+    use crate::http_handler::HttpMcpHandler;
     use crate::logging::{McpConnectionId, McpDebugLogger};
     use crate::shared::McpProtocolEngine;
     use crate::transport::{

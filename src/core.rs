@@ -4,7 +4,7 @@
 
 use {
     super::handlers::McpHandlers,
-    super::http::HttpMcpHandler,
+    super::http_handler::HttpMcpHandler,
     super::logging::McpDebugLogger,
     super::protocol::McpProtocol,
     super::shared::McpProtocolEngine,
