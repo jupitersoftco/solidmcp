@@ -158,23 +158,31 @@ async fn handle_mcp_http(
         .and_then(|m| m.get("progressToken"))
         .is_some();
 
-    trace!("🔍 === MESSAGE STRUCTURE ===");
-    trace!("   Method: {}", method);
-    trace!("   ID: {:?}", msg_id);
-    trace!("   Has Params: {}", has_params);
-    trace!("   Has Meta: {}", has_meta);
-    trace!("   Has Progress Token: {}", has_progress_token);
+    trace!(
+        method = %method,
+        message_id = ?msg_id,
+        has_params = has_params,
+        has_meta = has_meta,
+        has_progress_token = has_progress_token,
+        "Message structure analysis"
+    );
 
     if has_progress_token {
         let progress_token = message
             .get("params")
             .and_then(|p| p.get("_meta"))
             .and_then(|m| m.get("progressToken"));
-        warn!("⚡ PROGRESS TOKEN DETECTED: {:?}", progress_token);
-        warn!("   This indicates client expects streaming updates!");
+        warn!(
+            progress_token = ?progress_token,
+            "Progress token detected - client expects streaming updates"
+        );
 
         if is_cursor_client {
-            warn!("🎯 CURSOR + PROGRESS TOKEN: Critical protocol path!");
+            warn!(
+                client = "Cursor",
+                protocol_path = "critical",
+                "Cursor client with progress token detected"
+            );
         }
     }
 
@@ -182,36 +190,34 @@ async fn handle_mcp_http(
     let message_json = serde_json::to_string(&message).unwrap_or_default();
     let request_size = message_json.len();
 
-    trace!("📊 === REQUEST SIZE ANALYSIS ===");
-    trace!("   Request Size: {} bytes", request_size);
-    trace!("   Request Size KB: {:.2} KB", request_size as f64 / 1024.0);
+    trace!(
+        request_size_bytes = request_size,
+        request_size_kb = format!("{:.2}", request_size as f64 / 1024.0),
+        "Request size analysis"
+    );
 
     if request_size > 10000 {
         warn!(
-            "⚠️  LARGE REQUEST: {} bytes may cause processing issues",
-            request_size
+            request_size_bytes = request_size,
+            threshold = 10000,
+            "Large request detected - may cause processing issues"
         );
     }
 
     trace!(
-        "📥 MCP HTTP request - Content-Type: {}, Accept: {}, Connection: {}",
-        content_type, accept, connection
-    );
-    trace!("📥 INCOMING MCP REQUEST:");
-    trace!(
-        "   📋 Raw request body: {}",
-        serde_json::to_string(&message).unwrap_or_else(|_| "invalid json".to_string())
+        content_type = %content_type,
+        accept = %accept,
+        connection = %connection,
+        "MCP HTTP request headers"
     );
     trace!(
-        "   📋 Raw request body (hex): {:?}",
-        serde_json::to_string(&message)
-            .unwrap_or_else(|_| "invalid json".to_string())
-            .as_bytes()
+        raw_request_body = %serde_json::to_string(&message).unwrap_or_else(|_| "invalid json".to_string()),
+        content_type = %content_type,
+        accept = %accept,
+        connection = %connection,
+        cookie = ?cookie,
+        "Incoming MCP request details"
     );
-    trace!("   📋 Content-Type: {}", content_type);
-    trace!("   📋 Accept: {}", accept);
-    trace!("   📋 Connection: {}", connection);
-    trace!("   📋 Cookie: {:?}", cookie);
 
     // Extract session ID from cookie
     let session_id = extract_session_id_from_cookie(&cookie);
@@ -226,8 +232,9 @@ async fn handle_mcp_http(
         // or when clients don't send cookies (like Claude)
         if method != "initialize" && session_id.is_none() {
             debug!(
-                "⚠️  No session cookie found for method '{}'. Using default HTTP session.",
-                method
+                method = %method,
+                fallback_session = "http_default_session",
+                "No session cookie found - using default HTTP session"
             );
         }
         Some("http_default_session".to_string())

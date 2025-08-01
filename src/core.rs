@@ -175,10 +175,11 @@ impl McpServer {
             .await
             .map_err(|e| anyhow::anyhow!("Could not bind to {}: {}", addr, e))?;
 
-        println!("🌐 MCP Server listening on ws://{addr}/mcp and http://{addr}/mcp");
-        println!("📡 Available endpoints:");
-        println!("  WS  /mcp (WebSocket upgrade)");
-        println!("  POST /mcp (HTTP JSON-RPC)");
+        crate::logging::log_server_ready(&format!("ws://{addr}/mcp and http://{addr}/mcp"));
+        crate::logging::info!(
+            endpoints = ?vec!["WS /mcp (WebSocket upgrade)", "POST /mcp (HTTP JSON-RPC)"],
+            "Available endpoints"
+        );
 
         use tokio_stream::wrappers::TcpListenerStream;
         warp::serve(routes)
