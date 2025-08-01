@@ -7,7 +7,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::time::timeout;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::tungstenite::Message;
 
 mod mcp_test_helpers;
 use mcp_test_helpers::{with_mcp_test_server, with_mcp_connection};
@@ -290,7 +290,7 @@ async fn test_http_progress_with_session_management() {
 #[tokio::test]
 async fn test_websocket_progress_notifications_basic_flow() {
     // Test basic progress notification flow over WebSocket
-    with_mcp_connection("ws_progress_basic", |server, mut write, mut read| async move {
+    with_mcp_connection("ws_progress_basic", |_server, mut write, mut read| async move {
         // Tool call with progress token
         let tool_call = json!({
             "jsonrpc": "2.0",
@@ -332,7 +332,7 @@ async fn test_websocket_progress_notifications_basic_flow() {
 #[tokio::test]
 async fn test_websocket_concurrent_progress_notifications() {
     // Test multiple concurrent progress notifications over WebSocket
-    with_mcp_connection("ws_concurrent_progress", |server, mut write, mut read| async move {
+    with_mcp_connection("ws_concurrent_progress", |_server, mut write, mut read| async move {
         // Send multiple tool calls with different progress tokens concurrently
         let progress_tokens = vec![
             "concurrent-token-1",
@@ -396,7 +396,7 @@ async fn test_websocket_concurrent_progress_notifications() {
 #[tokio::test]
 async fn test_websocket_progress_with_large_payloads() {
     // Test progress notifications with large message payloads
-    with_mcp_connection("ws_progress_large", |server, mut write, mut read| async move {
+    with_mcp_connection("ws_progress_large", |_server, mut write, mut read| async move {
         // Create large payload
         let large_data = (0..10000).map(|i| format!("data-item-{}", i)).collect::<Vec<_>>();
         
@@ -755,7 +755,7 @@ async fn test_progress_notifications_performance() {
 #[tokio::test]
 async fn test_websocket_progress_notifications_stress() {
     // Stress test WebSocket progress notifications
-    with_mcp_connection("ws_progress_stress", |server, mut write, mut read| async move {
+    with_mcp_connection("ws_progress_stress", |_server, mut write, mut read| async move {
         let num_requests = 20;
         let start_time = std::time::Instant::now();
 

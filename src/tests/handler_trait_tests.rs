@@ -64,6 +64,15 @@ mod tests {
                         },
                         "required": ["message"]
                     }),
+                    output_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "success": { "type": "boolean" },
+                            "processed": { "type": "string" },
+                            "arguments": { "type": "object" }
+                        },
+                        "required": ["success", "processed", "arguments"]
+                    }),
                 },
                 ToolDefinition {
                     name: "failing_tool".to_string(),
@@ -71,6 +80,12 @@ mod tests {
                     input_schema: json!({
                         "type": "object",
                         "properties": {}
+                    }),
+                    output_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "error": { "type": "string" }
+                        }
                     }),
                 },
             ])

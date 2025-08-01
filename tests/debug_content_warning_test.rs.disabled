@@ -4,7 +4,7 @@
 //! debug content in JSON-RPC responses and triggers warnings.
 
 use serde_json::json;
-use solidmcp::{McpServer, Tool};
+use solidmcp::McpServer;
 use std::collections::HashMap;
 
 mod mcp_test_helpers;

@@ -90,7 +90,7 @@ mod tests {
 
         for (cookie_header, expected) in test_cases {
             let result = extract_session_id_from_cookie(&cookie_header);
-            assert_eq!(result, expected, "Failed for cookie: '{:?}'", cookie_header);
+            assert_eq!(result, expected, "Failed for cookie: '{cookie_header:?}'");
         }
     }
 
@@ -224,7 +224,7 @@ mod tests {
         let session_id = generate_session_id();
 
         // Simulate cookie creation
-        let cookie_header = format!("mcp_session={}", session_id);
+        let cookie_header = format!("mcp_session={session_id}");
         let cookie_opt = Some(cookie_header);
 
         // Test extraction

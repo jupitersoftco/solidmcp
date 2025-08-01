@@ -29,6 +29,13 @@ impl McpHandler for TestMcpHandler {
                     "message": {"type": "string"}
                 }
             }),
+            output_schema: json!({
+                "type": "object",
+                "properties": {
+                    "response": {"type": "string"}
+                },
+                "required": ["response"]
+            }),
         }])
     }
 

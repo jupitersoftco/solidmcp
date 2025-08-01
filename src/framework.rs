@@ -59,7 +59,7 @@
 
 use {
     crate::{
-        content_types::{McpResponse, ToMcpResponse},
+        content_types::McpResponse,
         core::McpServer,
         handler::{
             LogLevel, McpContext, McpHandler, McpNotification, PromptContent, PromptInfo,
@@ -368,6 +368,81 @@ impl<C: Send + Sync + 'static> ToolRegistry<C> {
 
                 // Convert McpResponse to JSON - this ensures MCP protocol compliance
                 Ok(serde_json::to_value(mcp_response)?)
+            })
+        });
+
+        self.tools.insert(name.to_string(), (tool_def, wrapper));
+    }
+
+    /// Register a tool with both input and output schema types.
+    ///
+    /// This method provides full type safety for both input and output of tools,
+    /// automatically generating JSON schemas for validation on both ends.
+    ///
+    /// # Type Parameters
+    /// - `I`: Input type (must implement `JsonSchema` and `DeserializeOwned`)
+    /// - `O`: Output type (must implement `JsonSchema` and `Serialize`)
+    /// - `F`: Handler function type
+    /// - `Fut`: Future returned by the handler function
+    ///
+    /// # Parameters
+    /// - `name`: Unique name for the tool
+    /// - `description`: Human-readable description of what the tool does
+    /// - `handler`: Async function that takes input type I and returns output type O
+    ///
+    /// # Examples
+    /// ```rust
+    /// use schemars::JsonSchema;
+    /// use serde::{Deserialize, Serialize};
+    ///
+    /// #[derive(JsonSchema, Deserialize)]
+    /// struct CalculateInput {
+    ///     a: f64,
+    ///     b: f64,
+    ///     operation: String,
+    /// }
+    ///
+    /// #[derive(JsonSchema, Serialize)]
+    /// struct CalculateOutput {
+    ///     result: f64,
+    ///     formula: String,
+    /// }
+    ///
+    /// registry.register_tool_with_schemas("calculate", "Perform calculations", |input: CalculateInput, ctx, notif| async move {
+    ///     let result = match input.operation.as_str() {
+    ///         "add" => input.a + input.b,
+    ///         "multiply" => input.a * input.b,
+    ///         _ => return Err(anyhow::anyhow!("Unknown operation")),
+    ///     };
+    ///     
+    ///     Ok(CalculateOutput {
+    ///         result,
+    ///         formula: format!("{} {} {} = {}", input.a, input.operation, input.b, result),
+    ///     })
+    /// });
+    /// ```
+    pub fn register_tool_with_schemas<I, O, F, Fut>(&mut self, name: &str, description: &str, handler: F)
+    where
+        I: JsonSchema + DeserializeOwned + Send + 'static,
+        O: JsonSchema + serde::Serialize + 'static,
+        F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<O>> + Send + 'static,
+    {
+        let tool_def = ToolDefinition::from_schemas::<I, O>(name, description);
+        let handler = Arc::new(handler);
+
+        let wrapper: ToolFunction<C> = Box::new(move |args, context, notification_ctx| {
+            let handler = Arc::clone(&handler);
+
+            Box::pin(async move {
+                // Parse and validate input
+                let input: I = serde_json::from_value(args)?;
+
+                // Call the handler
+                let output = handler(input, context, notification_ctx).await?;
+
+                // Serialize output - this is already validated against the schema
+                Ok(serde_json::to_value(output)?)
             })
         });
 
@@ -910,6 +985,70 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
         self.handler
             .registry_mut()
             .register_tool(name, description, handler);
+        self
+    }
+
+    /// Register a tool with both input and output schema types.
+    ///
+    /// This method provides full type safety for both input and output of tools,
+    /// automatically generating JSON schemas for validation on both ends.
+    ///
+    /// # Type Parameters
+    /// - `I`: Input type (must implement `JsonSchema` and `DeserializeOwned`)
+    /// - `O`: Output type (must implement `JsonSchema` and `Serialize`)
+    /// - `F`: Handler function type (async closure or function)
+    /// - `Fut`: Future type returned by the handler
+    ///
+    /// # Parameters
+    /// - `name`: Unique tool name (used by clients to invoke the tool)
+    /// - `description`: Human-readable description of what the tool does
+    /// - `handler`: Async function that takes input type I and returns output type O
+    ///
+    /// # Returns
+    /// The builder (for method chaining)
+    ///
+    /// # Examples
+    /// ```rust
+    /// use solidmcp::{McpServerBuilder, JsonSchema};
+    /// use serde::{Deserialize, Serialize};
+    ///
+    /// #[derive(JsonSchema, Deserialize)]
+    /// struct TranslateInput {
+    ///     text: String,
+    ///     from_language: String,
+    ///     to_language: String,
+    /// }
+    ///
+    /// #[derive(JsonSchema, Serialize)]
+    /// struct TranslateOutput {
+    ///     translated_text: String,
+    ///     confidence: f32,
+    ///     detected_language: Option<String>,
+    /// }
+    ///
+    /// let server = McpServerBuilder::new(AppContext::new(), "translator", "1.0.0")
+    ///     .with_tool_schemas("translate", "Translate text between languages", |input: TranslateInput, ctx, notif| async move {
+    ///         notif.info(&format!("Translating from {} to {}", input.from_language, input.to_language))?;
+    ///         
+    ///         let translation = ctx.translator.translate(&input.text, &input.from_language, &input.to_language).await?;
+    ///         
+    ///         Ok(TranslateOutput {
+    ///             translated_text: translation.text,
+    ///             confidence: translation.confidence,
+    ///             detected_language: translation.detected_language,
+    ///         })
+    ///     });
+    /// ```
+    pub fn with_tool_schemas<I, O, F, Fut>(mut self, name: &str, description: &str, handler: F) -> Self
+    where
+        I: JsonSchema + DeserializeOwned + Send + 'static,
+        O: JsonSchema + serde::Serialize + 'static,
+        F: Fn(I, Arc<C>, NotificationCtx) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<O>> + Send + 'static,
+    {
+        self.handler
+            .registry_mut()
+            .register_tool_with_schemas(name, description, handler);
         self
     }
 

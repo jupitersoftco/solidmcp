@@ -30,6 +30,21 @@ impl McpHandler for NotificationTestHandler {
                 },
                 "required": ["level", "message"]
             }),
+            output_schema: json!({
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string"},
+                                "text": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }),
         }])
     }
 

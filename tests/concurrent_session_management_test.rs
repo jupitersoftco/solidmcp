@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Barrier;
 use futures_util::future::join_all;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 
 mod mcp_test_helpers;
 use mcp_test_helpers::with_mcp_test_server;

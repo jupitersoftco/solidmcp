@@ -12,7 +12,7 @@ use {
     anyhow::Result,
     serde_json::{json, Value},
     std::sync::Arc,
-    tracing::{debug, error, info, warn},
+    tracing::{debug, error, trace, warn},
     warp::http::{HeaderValue, StatusCode},
     warp::{reply, Filter, Rejection, Reply},
 };
@@ -125,18 +125,18 @@ async fn handle_mcp_http(
     let connection = connection.unwrap_or_else(|| "close".to_string());
 
     // === PROTOCOL ANALYSIS LOGGING ===
-    info!("🚀 === MCP REQUEST ANALYSIS START ===");
-    info!("   Request ID: {}", request_id);
-    info!("   Timestamp: {:?}", request_start);
-    info!("   Content-Type: {}", content_type);
-    info!("   Accept: {}", accept);
-    info!("   Connection: {}", connection);
-    info!("   Cookie: {:?}", cookie);
+    trace!("🚀 === MCP REQUEST ANALYSIS START ===");
+    trace!("   Request ID: {}", request_id);
+    trace!("   Timestamp: {:?}", request_start);
+    trace!("   Content-Type: {}", content_type);
+    trace!("   Accept: {}", accept);
+    trace!("   Connection: {}", connection);
+    trace!("   Cookie: {:?}", cookie);
 
     // Detect Cursor client from User-Agent patterns in headers
     let is_cursor_client = content_type.contains("Cursor")
         || accept.contains("Cursor")
-        || cookie.as_ref().map_or(false, |c| c.contains("Cursor"));
+        || cookie.as_ref().is_some_and(|c| c.contains("Cursor"));
 
     if is_cursor_client {
         warn!("🎯 === CURSOR CLIENT DETECTED ===");
@@ -158,12 +158,12 @@ async fn handle_mcp_http(
         .and_then(|m| m.get("progressToken"))
         .is_some();
 
-    info!("🔍 === MESSAGE STRUCTURE ===");
-    info!("   Method: {}", method);
-    info!("   ID: {:?}", msg_id);
-    info!("   Has Params: {}", has_params);
-    info!("   Has Meta: {}", has_meta);
-    info!("   Has Progress Token: {}", has_progress_token);
+    trace!("🔍 === MESSAGE STRUCTURE ===");
+    trace!("   Method: {}", method);
+    trace!("   ID: {:?}", msg_id);
+    trace!("   Has Params: {}", has_params);
+    trace!("   Has Meta: {}", has_meta);
+    trace!("   Has Progress Token: {}", has_progress_token);
 
     if has_progress_token {
         let progress_token = message
@@ -182,9 +182,9 @@ async fn handle_mcp_http(
     let message_json = serde_json::to_string(&message).unwrap_or_default();
     let request_size = message_json.len();
 
-    info!("📊 === REQUEST SIZE ANALYSIS ===");
-    info!("   Request Size: {} bytes", request_size);
-    info!("   Request Size KB: {:.2} KB", request_size as f64 / 1024.0);
+    trace!("📊 === REQUEST SIZE ANALYSIS ===");
+    trace!("   Request Size: {} bytes", request_size);
+    trace!("   Request Size KB: {:.2} KB", request_size as f64 / 1024.0);
 
     if request_size > 10000 {
         warn!(
@@ -193,25 +193,25 @@ async fn handle_mcp_http(
         );
     }
 
-    info!(
+    trace!(
         "📥 MCP HTTP request - Content-Type: {}, Accept: {}, Connection: {}",
         content_type, accept, connection
     );
-    info!("📥 INCOMING MCP REQUEST:");
-    info!(
+    trace!("📥 INCOMING MCP REQUEST:");
+    trace!(
         "   📋 Raw request body: {}",
         serde_json::to_string(&message).unwrap_or_else(|_| "invalid json".to_string())
     );
-    info!(
+    trace!(
         "   📋 Raw request body (hex): {:?}",
         serde_json::to_string(&message)
             .unwrap_or_else(|_| "invalid json".to_string())
             .as_bytes()
     );
-    info!("   📋 Content-Type: {}", content_type);
-    info!("   📋 Accept: {}", accept);
-    info!("   📋 Connection: {}", connection);
-    info!("   📋 Cookie: {:?}", cookie);
+    trace!("   📋 Content-Type: {}", content_type);
+    trace!("   📋 Accept: {}", accept);
+    trace!("   📋 Connection: {}", connection);
+    trace!("   📋 Cookie: {:?}", cookie);
 
     // Extract session ID from cookie
     let session_id = extract_session_id_from_cookie(&cookie);
@@ -221,30 +221,29 @@ async fn handle_mcp_http(
 
     // For HTTP clients that don't handle cookies properly (like Claude), we need a fallback
     // Use a consistent session ID for the duration of the server process
-    let effective_session_id = if method == "initialize" {
+    let effective_session_id = if method == "initialize" || session_id.is_none() {
         // Always use a consistent session for initialize requests
-        Some("http_default_session".to_string())
-    } else if session_id.is_none() {
-        // Fallback: for clients that don't send cookies, use the same default session
-        // This allows stateless HTTP clients to work with the MCP protocol
-        warn!(
-            "⚠️  No session cookie found for method '{}'. Using default HTTP session.",
-            method
-        );
+        // or when clients don't send cookies (like Claude)
+        if method != "initialize" && session_id.is_none() {
+            debug!(
+                "⚠️  No session cookie found for method '{}'. Using default HTTP session.",
+                method
+            );
+        }
         Some("http_default_session".to_string())
     } else {
         session_id.clone()
     };
 
-    info!("🔍 SESSION DEBUG:");
-    info!(
+    trace!("🔍 SESSION DEBUG:");
+    trace!(
         "   📋 Method: {}",
         message.get("method").and_then(|m| m.as_str()).unwrap_or("")
     );
-    info!("   📋 Cookie header: {:?}", cookie);
-    info!("   📋 Extracted session: {:?}", session_id);
-    info!("   📋 Effective session: {:?}", effective_session_id);
-    info!("   📋 Message ID: {:?}", message.get("id"));
+    trace!("   📋 Cookie header: {:?}", cookie);
+    trace!("   📋 Extracted session: {:?}", session_id);
+    trace!("   📋 Effective session: {:?}", effective_session_id);
+    trace!("   📋 Message ID: {:?}", message.get("id"));
 
     // Validate the message
     if let Err(e) = McpValidator::validate_message(&message) {
@@ -260,7 +259,7 @@ async fn handle_mcp_http(
         return Ok(create_error_reply(error_response, StatusCode::BAD_REQUEST));
     }
 
-    info!("✅ MCP message validation passed");
+    trace!("✅ MCP message validation passed");
 
     // Check content type
     if !content_type.contains("application/json") {
@@ -303,12 +302,12 @@ async fn handle_mcp_http(
     // This prevents HTTP protocol violations and ensures compatibility
     let use_chunked = has_progress_token;
 
-    info!("🔧 HTTP encoding strategy:");
-    info!(
+    trace!("🔧 HTTP encoding strategy:");
+    trace!(
         "   Has Progress Token: {} (Accept: {}, Connection: {})",
         has_progress_token, accept, connection
     );
-    info!(
+    trace!(
         "   Using Chunked Encoding: {} ({})",
         use_chunked,
         if use_chunked {
@@ -411,13 +410,13 @@ async fn handle_mcp_http(
             let response_json = serde_json::to_string(&response).unwrap_or_default();
             let response_size = response_json.len();
 
-            info!("🎉 === MCP RESPONSE ANALYSIS ===");
-            info!("   Request ID: {}", request_id);
-            info!("   Processing Time: {:?}", response_processing_time);
-            info!("   Response Size: {} bytes", response_size);
-            info!("   Response KB: {:.2} KB", response_size as f64 / 1024.0);
-            info!("   Method: {}", method);
-            info!("   Message ID: {:?}", msg_id);
+            trace!("🎉 === MCP RESPONSE ANALYSIS ===");
+            trace!("   Request ID: {}", request_id);
+            trace!("   Processing Time: {:?}", response_processing_time);
+            trace!("   Response Size: {} bytes", response_size);
+            trace!("   Response KB: {:.2} KB", response_size as f64 / 1024.0);
+            trace!("   Method: {}", method);
+            trace!("   Message ID: {:?}", msg_id);
 
             // === CURSOR-SPECIFIC ANALYSIS ===
             if is_cursor_client {
@@ -458,21 +457,21 @@ async fn handle_mcp_http(
                 "unknown"
             };
 
-            info!("📋 === RESPONSE CONTENT ===");
-            info!("   Type: {}", result_type);
-            info!("   Has Result: {}", has_result);
-            info!("   Has Error: {}", has_error);
+            trace!("📋 === RESPONSE CONTENT ===");
+            trace!("   Type: {}", result_type);
+            trace!("   Has Result: {}", has_result);
+            trace!("   Has Error: {}", has_error);
 
             if has_result {
                 if let Some(result) = response.get("result") {
                     if let Some(tools) = result.get("tools") {
                         if let Some(tools_array) = tools.as_array() {
-                            info!("   Tools Count: {}", tools_array.len());
+                            trace!("   Tools Count: {}", tools_array.len());
                         }
                     }
                     if let Some(results) = result.get("results") {
                         if let Some(results_array) = results.as_array() {
-                            info!("   Results Count: {}", results_array.len());
+                            trace!("   Results Count: {}", results_array.len());
                         }
                     }
                 }
@@ -533,11 +532,11 @@ async fn handle_mcp_http(
             };
 
             // === COMPREHENSIVE HTTP HEADER ANALYSIS ===
-            info!("🔧 === HTTP RESPONSE HEADERS ANALYSIS ===");
-            info!("   Request ID: {}", request_id);
-            info!("   Use Chunked: {}", use_chunked);
-            info!("   Has Progress Token: {}", has_progress_token);
-            info!("   Connection Header: {}", connection_header);
+            trace!("🔧 === HTTP RESPONSE HEADERS ANALYSIS ===");
+            trace!("   Request ID: {}", request_id);
+            trace!("   Use Chunked: {}", use_chunked);
+            trace!("   Has Progress Token: {}", has_progress_token);
+            trace!("   Connection Header: {}", connection_header);
 
             if is_cursor_client {
                 warn!("🎯 === CURSOR HTTP HEADERS ===");
@@ -553,7 +552,7 @@ async fn handle_mcp_http(
 
             // === PROTOCOL VIOLATION PREVENTION ===
             // CRITICAL: Prevent the HTTP protocol violation that causes client timeouts
-            info!("🛡️  === PROTOCOL COMPLIANCE CHECK ===");
+            trace!("🛡️  === PROTOCOL COMPLIANCE CHECK ===");
             if use_chunked {
                 warn!("🔄 Using chunked transfer encoding");
                 warn!("   Will NOT set Content-Length (prevents protocol violation)");
@@ -617,7 +616,7 @@ async fn handle_mcp_http(
                         .as_ref()
                         .unwrap_or(&"default".to_string())
                 );
-                info!(
+                trace!(
                     "🍪 Set session cookie: {}",
                     effective_session_id
                         .as_ref()
@@ -662,20 +661,20 @@ async fn handle_mcp_http(
             warn!("   Status: {}", status);
             warn!("   Total Time: {:?}", total_request_time);
 
-            info!("📤 === MCP REQUEST COMPLETE ===");
-            info!("   Request ID: {}", request_id);
-            info!("   Method: {}", method);
-            info!("   Total Processing Time: {:?}", total_request_time);
-            info!("   Request Size: {} bytes", request_size);
-            info!("   Response Size: {} bytes", response_size);
-            info!("   Status: SUCCESS");
+            trace!("📤 === MCP REQUEST COMPLETE ===");
+            trace!("   Request ID: {}", request_id);
+            trace!("   Method: {}", method);
+            trace!("   Total Processing Time: {:?}", total_request_time);
+            trace!("   Request Size: {} bytes", request_size);
+            trace!("   Response Size: {} bytes", response_size);
+            trace!("   Status: SUCCESS");
 
             if is_cursor_client {
-                warn!("🎯 === CURSOR REQUEST COMPLETE ===");
-                warn!("   Request ID: {}", request_id);
-                warn!("   Total Time: {:?}", total_request_time);
-                warn!("   Response Size: {} bytes", response_size);
-                warn!(
+                debug!("🎯 === CURSOR REQUEST COMPLETE ===");
+                debug!("   Request ID: {}", request_id);
+                debug!("   Total Time: {:?}", total_request_time);
+                debug!("   Response Size: {} bytes", response_size);
+                debug!(
                     "   Headers: {}",
                     if use_chunked {
                         "Chunked"
@@ -683,7 +682,7 @@ async fn handle_mcp_http(
                         "Content-Length"
                     }
                 );
-                warn!("   Protocol Compliance: ✅ (No dual headers)");
+                debug!("   Protocol Compliance: ✅ (No dual headers)");
 
                 // Performance recommendations for Cursor
                 if response_size > 5000 && total_request_time.as_millis() > 1000 {
@@ -693,7 +692,7 @@ async fn handle_mcp_http(
                 }
             }
 
-            info!("📤 Sending HTTP MCP response with status: {}", status);
+            trace!("📤 Sending HTTP MCP response with status: {}", status);
 
             // Add a small delay to see if it helps with client timeouts
             // Especially important for Cursor client stability
@@ -704,7 +703,7 @@ async fn handle_mcp_http(
             };
             tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
 
-            info!("✅ === REQUEST {} COMPLETE ===", request_id);
+            trace!("✅ === REQUEST {} COMPLETE ===", request_id);
             Ok(final_reply.into_response())
         }
         Err(e) => {
@@ -739,7 +738,7 @@ async fn handle_mcp_options(
     capabilities: TransportCapabilities,
     _handler: Arc<McpProtocolEngine>,
 ) -> Result<warp::reply::Response, Rejection> {
-    info!("🌐 OPTIONS request with capabilities: {:?}", capabilities);
+    debug!("🌐 OPTIONS request with capabilities: {:?}", capabilities);
 
     let info = TransportInfo::new(&capabilities, "SolidMCP", "0.1.0", "/mcp");
     let response = info.to_json();
@@ -760,7 +759,7 @@ async fn handle_mcp_get(
     capabilities: TransportCapabilities,
     _handler: Arc<McpProtocolEngine>,
 ) -> Result<warp::reply::Response, Rejection> {
-    info!("🌐 GET request with capabilities: {:?}", capabilities);
+    debug!("🌐 GET request with capabilities: {:?}", capabilities);
 
     let negotiation =
         TransportNegotiation::negotiate("GET", &capabilities, false, "SolidMCP", "0.1.0", "/mcp");
@@ -769,7 +768,7 @@ async fn handle_mcp_get(
         TransportNegotiation::WebSocketUpgrade => {
             // Return transport info instead of error for WebSocket requests
             // This allows clients to discover available transports even when sending WS headers
-            info!("WebSocket headers detected, returning transport discovery info");
+            debug!("WebSocket headers detected, returning transport discovery info");
             let info = TransportInfo::new(&capabilities, "SolidMCP", "0.1.0", "/mcp");
             let response = info.to_json();
             let mut headers = cors_headers();
@@ -833,7 +832,7 @@ async fn handle_mcp_enhanced_post(
     cookie: Option<String>,
     handler: Arc<McpProtocolEngine>,
 ) -> Result<warp::reply::Response, Rejection> {
-    info!(
+    debug!(
         "🌐 Enhanced POST request with capabilities: {:?}",
         capabilities
     );
@@ -844,17 +843,17 @@ async fn handle_mcp_enhanced_post(
     match negotiation {
         TransportNegotiation::HttpJsonRpc => {
             // Use the existing HTTP handler logic but with enhanced logging
-            info!(
+            debug!(
                 "📡 Using HTTP JSON-RPC transport (preferred: {})",
                 capabilities.preferred_transport()
             );
 
             // Log client information
             if let Some(client_info) = &capabilities.client_info {
-                info!("🔍 Client: {}", client_info);
+                debug!("🔍 Client: {}", client_info);
             }
             if let Some(protocol_version) = &capabilities.protocol_version {
-                info!("🔍 Requested protocol version: {}", protocol_version);
+                debug!("🔍 Requested protocol version: {}", protocol_version);
             }
 
             // Call the existing handler with converted parameters
@@ -923,7 +922,7 @@ async fn handle_mcp_sse_fallback(
     _cache_control: Option<String>,
     _handler: Arc<McpProtocolEngine>,
 ) -> Result<warp::reply::Response, Rejection> {
-    info!("🌐 SSE fallback request with Accept: {:?}", accept);
+    debug!("🌐 SSE fallback request with Accept: {:?}", accept);
 
     // Check if this is actually an SSE request
     if let Some(accept_header) = &accept {
@@ -964,8 +963,8 @@ fn extract_session_id_from_cookie(cookie: &Option<String>) -> Option<String> {
     if let Some(cookie_str) = cookie {
         for cookie_pair in cookie_str.split(';') {
             let trimmed = cookie_pair.trim();
-            if trimmed.starts_with("mcp_session=") {
-                let session_id = trimmed[12..].trim(); // Remove "mcp_session="
+            if let Some(stripped) = trimmed.strip_prefix("mcp_session=") {
+                let session_id = stripped.trim(); // Remove "mcp_session="
                 if !session_id.is_empty() {
                     return Some(session_id.to_string());
                 }
@@ -976,6 +975,7 @@ fn extract_session_id_from_cookie(cookie: &Option<String>) -> Option<String> {
 }
 
 /// Generate a new session ID
+#[cfg(test)]
 fn generate_session_id() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -1095,9 +1095,7 @@ mod tests {
         let method = "initialize";
         let session_id: Option<String> = None;
 
-        let effective_session_id = if method == "initialize" {
-            Some("http_default_session".to_string())
-        } else if session_id.is_none() {
+        let effective_session_id = if method == "initialize" || session_id.is_none() {
             Some("http_default_session".to_string())
         } else {
             session_id.clone()
@@ -1112,9 +1110,7 @@ mod tests {
         let method = "tools/list";
         let session_id: Option<String> = None;
 
-        let effective_session_id = if method == "initialize" {
-            Some("http_default_session".to_string())
-        } else if session_id.is_none() {
+        let effective_session_id = if method == "initialize" || session_id.is_none() {
             Some("http_default_session".to_string())
         } else {
             session_id.clone()
@@ -1129,9 +1125,7 @@ mod tests {
         let method = "tools/list";
         let session_id = Some("existing_session".to_string());
 
-        let effective_session_id = if method == "initialize" {
-            Some("http_default_session".to_string())
-        } else if session_id.is_none() {
+        let effective_session_id = if method == "initialize" || session_id.is_none() {
             Some("http_default_session".to_string())
         } else {
             session_id.clone()

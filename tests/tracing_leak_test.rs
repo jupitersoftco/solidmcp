@@ -4,7 +4,6 @@
 //! into the actual JSON-RPC response body, causing protocol violations.
 
 use serde_json::json;
-use std::sync::{Arc, Mutex};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;

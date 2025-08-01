@@ -12,7 +12,7 @@ use solidmcp::handler::{PromptInfo, PromptContent, PromptMessage, PromptArgument
 /// Test context for prompt tests
 #[derive(Clone)]
 pub struct TestContext {
-    pub server_name: String,
+    pub _server_name: String,
 }
 
 /// Test prompt provider that provides sample prompts
@@ -101,7 +101,7 @@ impl PromptProvider<TestContext> for TestPromptProvider {
 /// Helper to create a test server with prompt providers
 pub async fn create_test_server_with_prompts() -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
     let context = TestContext {
-        server_name: "test-prompt-server".to_string(),
+        _server_name: "test-prompt-server".to_string(),
     };
 
     let server = McpServerBuilder::new(context, "test-prompt-server", "1.0.0")

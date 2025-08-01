@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     use crate::protocol_impl::McpProtocolHandlerImpl;
-    use crate::transport::{TransportCapabilities, TransportInfo, TransportType};
+    use crate::transport::{TransportCapabilities, TransportInfo};
     use serde_json::{json, Value};
     use warp::http::HeaderMap;
 
@@ -75,8 +75,8 @@ mod tests {
         let mut deeply_nested = json!({});
         let mut current = &mut deeply_nested;
         for i in 0..100 {
-            current[format!("level_{}", i)] = json!({});
-            current = &mut current[format!("level_{}", i)];
+            current[format!("level_{i}")] = json!({});
+            current = &mut current[format!("level_{i}")];
         }
         current["value"] = json!("deep");
 
@@ -101,7 +101,7 @@ mod tests {
         let mut handler = McpProtocolHandlerImpl::new();
 
         // Test with various unicode characters
-        let unicode_tests = vec![
+        let unicode_tests = [
             "Hello 世界", // Chinese
             "Привет мир", // Russian
             "🚀🔧🌟", // Emojis

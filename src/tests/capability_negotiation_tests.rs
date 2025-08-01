@@ -270,7 +270,7 @@ mod tests {
             }
         });
 
-        let result = handler.handle_message(init).await.unwrap();
+        let _result = handler.handle_message(init).await.unwrap();
 
         // Test logging notification
         let log_notification = json!({
@@ -304,7 +304,7 @@ mod tests {
             }
         });
 
-        let result = handler.handle_message(init).await.unwrap();
+        let _result = handler.handle_message(init).await.unwrap();
 
         // Test sampling request (may not be supported by built-in handler)
         let sampling_request = json!({

@@ -4,14 +4,12 @@
 //! the MCP protocol format, preventing issues where Claude Code shows "no results found"
 //! when tools return raw JSON data instead of properly formatted MCP responses.
 
-use anyhow::Result;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
 use solidmcp::{
     content_types::{McpContent, McpResponse},
     framework::{McpServerBuilder, NotificationCtx},
-    JsonSchema as SolidMcpJsonSchema,
 };
 use std::sync::Arc;
 

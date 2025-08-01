@@ -17,7 +17,7 @@ pub mod tools_tests;
 pub mod transport_integration_tests;
 
 #[cfg(test)]
-mod tests {
+mod integration_tests {
     use crate::handlers::McpHandlers;
     use crate::logging::{McpConnectionId, McpDebugLogger};
     use crate::protocol::McpProtocol;
@@ -32,7 +32,7 @@ mod tests {
         let logger = McpDebugLogger::new(connection_id);
         let _handlers = McpHandlers::new(logger);
         // Basic handler creation test - just ensure it compiles
-        assert!(true);
+        // This test validates that handlers can be created successfully
     }
 
     #[tokio::test]

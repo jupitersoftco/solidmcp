@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 use warp::http::{HeaderMap, HeaderValue};
 use warp::Filter;
 
@@ -260,10 +260,10 @@ impl TransportNegotiation {
         match method.to_uppercase().as_str() {
             "GET" => {
                 if capabilities.supports_websocket {
-                    info!("Negotiated WebSocket transport");
+                    debug!("Negotiated WebSocket transport");
                     TransportNegotiation::WebSocketUpgrade
                 } else {
-                    info!("Providing transport information for GET request");
+                    debug!("Providing transport information for GET request");
                     let info =
                         TransportInfo::new(capabilities, server_name, server_version, endpoint);
                     TransportNegotiation::InfoResponse(info)
@@ -271,7 +271,7 @@ impl TransportNegotiation {
             }
             "POST" => {
                 if has_body {
-                    info!("Negotiated HTTP JSON-RPC transport");
+                    debug!("Negotiated HTTP JSON-RPC transport");
                     TransportNegotiation::HttpJsonRpc
                 } else {
                     warn!("POST request without body");
@@ -282,14 +282,14 @@ impl TransportNegotiation {
                 }
             }
             "OPTIONS" => {
-                info!("Providing CORS and capability information");
+                debug!("Providing CORS and capability information");
                 let info = TransportInfo::new(capabilities, server_name, server_version, endpoint);
                 TransportNegotiation::InfoResponse(info)
             }
             _ => {
                 warn!("Unsupported HTTP method: {}", method);
                 TransportNegotiation::UnsupportedTransport {
-                    error: format!("Unsupported HTTP method: {}", method),
+                    error: format!("Unsupported HTTP method: {method}"),
                     supported: vec![TransportType::WebSocket, TransportType::HttpOnly],
                 }
             }

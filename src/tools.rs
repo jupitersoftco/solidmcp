@@ -143,20 +143,20 @@ impl McpTools {
         match tool_name {
             "echo" => {
                 if let Some(message) = result.get("echo").and_then(|v| v.as_str()) {
-                    format!("Echo: {}", message)
+                    format!("Echo: {message}")
                 } else {
                     "Echo completed".to_string()
                 }
             },
             "read_file" => {
                 if let Some(error) = result.get("error") {
-                    format!("File read error: {}", error)
+                    format!("File read error: {error}")
                 } else if let Some(path) = result.get("file_path").and_then(|v| v.as_str()) {
                     if let Some(content) = result.get("content").and_then(|v| v.as_str()) {
                         let len = content.len();
-                        format!("Successfully read file '{}' ({} bytes)", path, len)
+                        format!("Successfully read file '{path}' ({len} bytes)")
                     } else {
-                        format!("Read file: {}", path)
+                        format!("Read file: {path}")
                     }
                 } else {
                     "File read completed".to_string()
@@ -166,12 +166,12 @@ impl McpTools {
                 // For search results or other tools, try to extract meaningful info
                 if let Some(query) = result.get("query").and_then(|v| v.as_str()) {
                     if let Some(results) = result.get("results").and_then(|v| v.as_array()) {
-                        format!("Found {} results for query '{}'", results.len(), query)
+                        format!("Found {} results for query '{query}'", results.len())
                     } else {
-                        format!("Search completed for query '{}'", query)
+                        format!("Search completed for query '{query}'")
                     }
                 } else {
-                    format!("Tool '{}' completed successfully", tool_name)
+                    format!("Tool '{tool_name}' completed successfully")
                 }
             }
         }

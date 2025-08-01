@@ -258,6 +258,13 @@ pub enum LogLevel {
 ///         },
 ///         "required": ["a", "b", "operation"]
 ///     }),
+///     output_schema: json!({
+///         "type": "object",
+///         "properties": {
+///             "result": { "type": "number" }
+///         },
+///         "required": ["result"]
+///     }),
 /// };
 /// ```
 #[derive(Debug, Clone)]
@@ -265,7 +272,7 @@ pub struct ToolDefinition {
     pub name: String,
     pub description: String,
     pub input_schema: Value,
-    pub output_schema: Option<Value>,
+    pub output_schema: Value,
 }
 
 impl ToolDefinition {
@@ -324,7 +331,11 @@ impl ToolDefinition {
             name: name.into(),
             description: description.into(),
             input_schema,
-            output_schema: None,
+            output_schema: serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+            }),
         }
     }
 
@@ -398,7 +409,7 @@ impl ToolDefinition {
             name: name.into(),
             description: description.into(),
             input_schema: input_json,
-            output_schema: Some(output_json),
+            output_schema: output_json,
         }
     }
 
@@ -420,18 +431,12 @@ impl ToolDefinition {
     /// assert!(json["input_schema"].is_object());
     /// ```
     pub fn to_json(&self) -> Value {
-        let mut json = serde_json::json!({
+        serde_json::json!({
             "name": self.name,
             "description": self.description,
-            "input_schema": self.input_schema
-        });
-        
-        // Add output_schema if present
-        if let Some(ref output_schema) = self.output_schema {
-            json["output_schema"] = output_schema.clone();
-        }
-        
-        json
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema
+        })
     }
 }
 

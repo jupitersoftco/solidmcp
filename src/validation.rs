@@ -240,8 +240,8 @@ pub struct ValidationReport {
     pub method_info: Option<String>,
 }
 
-impl ValidationReport {
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for ValidationReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut parts = Vec::new();
 
         if let Some(structure) = &self.message_structure {
@@ -260,6 +260,6 @@ impl ValidationReport {
             parts.push(format!("Warnings: {}", self.warnings.join("; ")));
         }
 
-        parts.join(" | ")
+        write!(f, "{}", parts.join(" | "))
     }
 }

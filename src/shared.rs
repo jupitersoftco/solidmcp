@@ -271,6 +271,7 @@ impl McpProtocolEngine {
                                     "name": t.name,
                                     "description": t.description,
                                     "inputSchema": t.input_schema,
+                                    "outputSchema": t.output_schema,
                                 })
                             })
                             .collect();

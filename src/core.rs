@@ -10,7 +10,7 @@ use {
     super::shared::McpProtocolEngine,
     anyhow::{Context, Result},
     std::sync::Arc,
-    tracing::info,
+    tracing::debug,
     warp::Filter,
 };
 
@@ -44,7 +44,7 @@ impl McpServer {
         let protocol = McpProtocol::new();
         let protocol_engine = Arc::new(McpProtocolEngine::new());
 
-        info!("🚀 Initializing MCP Server");
+        debug!("🚀 Initializing MCP Server");
         Ok(Self {
             protocol,
             protocol_engine,
@@ -100,7 +100,7 @@ impl McpServer {
         let protocol = McpProtocol::new();
         let protocol_engine = Arc::new(McpProtocolEngine::with_handler(handler));
 
-        info!("🚀 Initializing MCP Server with custom handler");
+        debug!("🚀 Initializing MCP Server with custom handler");
         Ok(Self {
             protocol,
             protocol_engine,
@@ -148,7 +148,7 @@ impl McpServer {
     /// }
     /// ```
     pub async fn start(&mut self, port: u16) -> Result<()> {
-        info!("🚀 Starting MCP Server on port {}", port);
+        debug!("🚀 Starting MCP Server on port {}", port);
 
         // Create HTTP handler
         let http_handler = HttpMcpHandler::new(self.protocol_engine.clone());
