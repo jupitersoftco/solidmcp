@@ -41,7 +41,12 @@ Each TODO follows this pattern:
    - Added comprehensive builder pattern tests
    - Covered tool registration, context sharing, error handling
    - Tests serve as living documentation for framework API
-8. [TODO-025: Add Integration Tests for Protocol Flows](./TODO-025.md) - Depends on: TODO-024
+8. ✅ **[TODO-025: Add Integration Tests for Protocol Flows](./TODO-025.md)** - **COMPLETED** (2025-08-01)
+   - Created comprehensive integration test suite with 7 passing tests
+   - Protocol flow tests verify full MCP initialization → tools/list → tools/call sequences
+   - Error handling tests validate JSON-RPC 2.0 compliance
+   - Concurrent client tests ensure session isolation and performance
+   - Fixed port allocation and /mcp endpoint routing issues
 
 ### 🔵 PERFORMANCE OPTIMIZATIONS (Week 4)
 9. [TODO-027: Optimize JSON Processing Pipeline](./TODO-027.md) - Depends on: TODO-018

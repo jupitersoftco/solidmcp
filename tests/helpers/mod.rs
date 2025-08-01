@@ -54,49 +54,90 @@ pub struct TestServer {
 impl TestServer {
     /// Start a test server with a simple test tool
     pub async fn start() -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        
-        let context = TestContext::new("test-server");
-        
-        let mut server = McpServerBuilder::new(context, "test-server", "1.0.0")
-            .with_tool(
-                "test_tool",
-                "A test tool for integration testing",
-                |input: TestInput, ctx: Arc<TestContext>, _notify| async move {
-                    let count = ctx.increment();
-                    Ok(TestOutput {
-                        output: format!("Processed: {}", input.input),
-                        count,
-                    })
+        // Find a free port by trying different port ranges
+        for base_port in [8080, 9000, 9500, 8000, 7000] {
+            for port_offset in 0..100 {
+                let port = base_port + port_offset;
+                let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+                
+                // Check if port is available by trying to bind
+                if let Ok(listener) = std::net::TcpListener::bind(addr) {
+                    drop(listener); // Release the port
+                    
+                    let context = TestContext::new("test-server");
+                    
+                    match McpServerBuilder::new(context, "test-server", "1.0.0")
+                        .with_tool(
+                            "test_tool",
+                            "A test tool for integration testing",
+                            |input: TestInput, ctx: Arc<TestContext>, _notify| async move {
+                                let count = ctx.increment();
+                                Ok(TestOutput {
+                                    output: format!("Processed: {}", input.input),
+                                    count,
+                                })
+                            }
+                        )
+                        .with_tool(
+                            "error_tool",
+                            "A tool that always errors for testing",
+                            |_input: TestInput, _ctx: Arc<TestContext>, _notify| async move {
+                                let result: Result<TestOutput, solidmcp::McpError> = 
+                                    Err(solidmcp::McpError::Internal("Test error".to_string()));
+                                result
+                            }
+                        )
+                        .build()
+                        .await {
+                        Ok(mut server) => {
+                            let handle = tokio::spawn(async move {
+                                if let Err(e) = server.start(port).await {
+                                    eprintln!("Server failed to start on port {}: {}", port, e);
+                                }
+                            });
+                            
+                            // Wait for server to be ready and test connectivity
+                            tokio::time::sleep(Duration::from_millis(500)).await;
+                            
+                            // Test that server is responding on /health endpoint
+                            let test_client = reqwest::Client::new();
+                            for _ in 0..10 {
+                                match test_client.get(&format!("http://127.0.0.1:{}/health", port)).send().await {
+                                    Ok(response) => {
+                                        if response.status() == reqwest::StatusCode::OK {
+                                            // Server is ready!
+                                            break;
+                                        }
+                                    },
+                                    Err(_) => {
+                                        // Server not ready yet
+                                        tokio::time::sleep(Duration::from_millis(100)).await;
+                                        continue;
+                                    }
+                                }
+                            }
+                            
+                            return TestServer { addr, handle };
+                        },
+                        Err(e) => {
+                            eprintln!("Failed to build server: {}", e);
+                            continue;
+                        }
+                    }
                 }
-            )
-            .with_tool(
-                "error_tool",
-                "A tool that always errors for testing",
-                |_input: TestInput, _ctx: Arc<TestContext>, _notify| async move {
-                    let result: Result<TestOutput, solidmcp::McpError> = 
-                        Err(solidmcp::McpError::Internal("Test error".to_string()));
-                    result
-                }
-            )
-            .build()
-            .await
-            .unwrap();
+            }
+        }
         
-        let handle = tokio::spawn(async move {
-            server.start(addr.port()).await.unwrap();
-        });
-        
-        // Wait for server to be ready
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        
-        TestServer { addr, handle }
+        panic!("Failed to find an available port for test server");
     }
     
     /// Get the HTTP URL for the server
     pub fn url(&self, path: &str) -> String {
-        format!("http://{}{}", self.addr, path)
+        if path == "/" {
+            format!("http://{}/mcp", self.addr)
+        } else {
+            format!("http://{}{}", self.addr, path)
+        }
     }
     
     /// Get the WebSocket URL for the server
@@ -144,7 +185,15 @@ impl McpHttpClient {
             }
         }
         
-        response.json().await.map_err(|e| e.to_string())
+        // Get the response text first for debugging
+        let status = response.status();
+        let headers = response.headers().clone();
+        let text = response.text().await.map_err(|e| format!("Failed to get response text: {}", e))?;
+        
+        // Try to parse as JSON
+        serde_json::from_str(&text).map_err(|e| {
+            format!("Failed to parse JSON (status: {}, body: '{}'): {}", status, text, e)
+        })
     }
     
     /// Initialize the MCP session
