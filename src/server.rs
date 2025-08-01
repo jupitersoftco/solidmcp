@@ -3,7 +3,6 @@
 //! Core server struct and basic functionality for the Model Context Protocol server.
 
 use {
-    super::handlers::McpHandlers,
     super::http_handler::HttpMcpHandler,
     super::logging::McpDebugLogger,
     super::protocol::McpProtocol,
@@ -189,22 +188,6 @@ impl McpServer {
         Ok(())
     }
 
-    /// Get a new handler instance for processing messages.
-    ///
-    /// This method creates a new `McpHandlers` instance with a fresh debug logger.
-    /// It's primarily used internally by the transport layers.
-    ///
-    /// # Returns
-    ///
-    /// A new `McpHandlers` instance with a unique connection ID
-    ///
-    /// # Note
-    ///
-    /// This is mainly for internal use and backward compatibility
-    pub fn create_handler(&self) -> McpHandlers {
-        let logger = McpDebugLogger::new(super::logging::McpConnectionId::new());
-        McpHandlers::new(logger)
-    }
 
     /// Get the protocol instance.
     ///

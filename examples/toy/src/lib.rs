@@ -7,10 +7,8 @@ use {
     async_trait::async_trait,
     serde_json::Value,
     solidmcp::{
-        framework::{PromptProvider, ResourceProvider},
-        handler::{
-            PromptArgument, PromptContent, PromptInfo, PromptMessage, ResourceContent, ResourceInfo,
-        },
+        PromptProvider, ResourceProvider,
+        PromptArgument, PromptContent, PromptInfo, PromptMessage, ResourceContent, ResourceInfo,
     },
     std::{collections::HashMap, fs, path::PathBuf, sync::Arc},
     tokio::sync::RwLock,

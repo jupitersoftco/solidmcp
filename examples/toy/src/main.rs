@@ -7,7 +7,7 @@ use {
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
     serde_json::Value,
-    solidmcp::framework::McpServerBuilder,
+    solidmcp::McpServerBuilder,
     std::{env, sync::Arc},
     toy_notes_server::{NotesContext, NotesPromptProvider, NotesResourceProvider},
     tracing::info,

@@ -1,59 +1,99 @@
-//! MCP (Model Context Protocol) Server Library
-//!
-//! A standalone implementation of the Model Context Protocol server
-//! supporting both WebSocket and HTTP transports.
+//! SolidMCP - A Rust framework for building MCP (Model Context Protocol) servers
+//! 
+//! SolidMCP provides a type-safe, ergonomic API for creating Model Context Protocol
+//! servers with support for tools, resources, and prompts.
+//! 
+//! # Quick Start
+//! 
+//! ```rust,no_run
+//! use solidmcp::{McpServerBuilder, ToolResponse};
+//! use serde_json::json;
+//! 
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let server = McpServerBuilder::new()
+//!         .with_tool("hello", "Say hello", |_params| async {
+//!             Ok(ToolResponse::success("Hello, world!"))
+//!         })
+//!         .build();
+//!     
+//!     server.start(3000).await
+//! }
+//! ```
+//! 
+//! # Features
+//! 
+//! - **Type-safe tools** with automatic JSON schema generation
+//! - **WebSocket and HTTP** transport support
+//! - **Resource providers** for exposing data
+//! - **Prompt templates** for structured interactions
+//! - **Async/await** throughout
 
-// Re-export the main modules
-pub mod content_types;
-pub mod core;
-pub mod error;
-pub mod framework;
-pub mod handler;
-pub mod handlers;
-pub mod http;
-pub mod http_handler;
-pub mod logging;
-pub mod protocol;
-pub mod protocol_impl;
-// Legacy trait removed - internal use only
-// pub mod protocol_testable;
-// Legacy server module removed - use framework module instead
-pub mod shared;
-pub mod tool_response;
-pub mod tools;
-pub mod transport;
-pub mod typed_response;
-pub mod validation;
-pub mod websocket;
+// Internal modules (not exposed)
+mod content_types;
+mod error;
+mod framework;
+mod handler;
+mod http;
+mod http_handler;
+mod logging;
+mod protocol;
+mod protocol_impl;
+mod response;
+mod server;
+mod shared;
+mod tool_response;
+mod transport;
+mod typed_response;
+mod types;
+mod validation;
+mod websocket;
 
 // Test modules
 #[cfg(test)]
-pub mod tests;
+mod tests;
 
-// Re-export key types
-pub use core::McpServer;
-pub use protocol::McpProtocol;
-pub use protocol_impl::McpProtocolHandlerImpl;
-// Legacy trait removed - McpProtocolHandler is now internal
-pub use tools::McpTools;
+// === PUBLIC API ===
+// Keep this minimal and stable!
 
-// Re-export core handler trait and types
-pub use handler::{
-    LogLevel, McpContext, McpHandler, McpNotification, PromptArgument, PromptContent, PromptInfo,
-    PromptMessage, ResourceContent, ResourceInfo, ToolDefinition, TypedToolDefinition,
+// Core server type
+pub use crate::server::McpServer;
+
+// Framework API (preferred)
+pub use crate::framework::{McpServerBuilder, PromptProvider, ResourceProvider};
+
+// Handler trait and context
+pub use crate::handler::{McpHandler, McpContext};
+
+// Type definitions
+pub use crate::types::{
+    PromptArgument, PromptContent, PromptDefinition,
+    PromptInfo, PromptMessage, ResourceContent, ResourceDefinition, ResourceInfo,
+    ToolDefinition, 
 };
 
-// Re-export schemars for convenience
+// Re-export from handler module (will be moved to types in future)
+pub use crate::handler::{
+    LogLevel, McpNotification, TypedToolDefinition,
+};
+
+// Response types
+pub use crate::response::{ToolContent, ToolResponse, TypedResponse};
+
+// Error types
+pub use crate::error::{McpError, McpResult};
+
+// Re-export commonly used dependencies
 pub use schemars::JsonSchema;
+pub use serde_json::{json, Value};
 
-// Re-export new framework API
-pub use framework::{FrameworkHandler, McpServerBuilder, PromptProvider, ResourceProvider};
+// Legacy exports for backward compatibility
+// These will be removed in v1.0
+#[doc(hidden)]
+pub use crate::protocol::McpProtocol;
+#[doc(hidden)]
+pub use crate::websocket::handle_mcp_ws_main as handle_mcp_ws;
 
-// Re-export content types for type-safe MCP responses
-pub use content_types::{McpContent, McpResponse, ToMcpResponse};
-
-// Re-export error types
-pub use error::{McpError, McpResult, ProtocolError, TransportError};
-
-// Re-export WebSocket handler for convenience
-pub use websocket::handle_mcp_ws_main as handle_mcp_ws;
+// Framework handler is internal but needed by examples
+#[doc(hidden)]
+pub use crate::framework::FrameworkHandler;

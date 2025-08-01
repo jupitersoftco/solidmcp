@@ -49,7 +49,7 @@ struct NotificationResult {
 
 /// Create a test server using the new framework with real NotesContext
 async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
-    use solidmcp::framework::McpServerBuilder;
+    use solidmcp::McpServerBuilder;
 
     // Ensure directory exists
     if !notes_dir.exists() {
