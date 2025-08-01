@@ -7,6 +7,9 @@
 mod provider_methods;
 mod tool_methods;
 
+#[cfg(test)]
+mod tests;
+
 use crate::server::McpServer;
 use anyhow::Result;
 use std::sync::Arc;
