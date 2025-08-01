@@ -4,7 +4,10 @@
 
 use {
     super::protocol::McpProtocol,
-    crate::error::{McpError, McpResult},
+    crate::{
+        error::{McpError, McpResult},
+        protocol::{RawMessage, ParsedMessage, InitializeParams, ToolCallParams},
+    },
     serde_json::{json, Value},
     std::sync::atomic::{AtomicBool, Ordering},
     tokio::sync::RwLock,
@@ -122,6 +125,110 @@ impl McpProtocolHandlerImpl {
 
     pub fn create_error_response(&self, id: Value, code: i32, message: &str) -> Value {
         self.protocol.create_error_response(id, code, message)
+    }
+
+    /// Optimized message handler that parses from bytes directly
+    /// 
+    /// This method provides significant performance improvements by:
+    /// - Parsing JSON from bytes without UTF-8 validation
+    /// - Using zero-copy parsing with RawValue
+    /// - Validating structure early
+    /// - Avoiding multiple JSON parsing passes
+    pub async fn handle_message_bytes(&self, message_bytes: &[u8]) -> McpResult<Value> {
+        // Single parse from bytes - much faster than from_str
+        let raw_msg = RawMessage::from_slice(message_bytes)?;
+        let id = raw_msg.get_id_value();
+        let method = raw_msg.method.to_string(); // Store method name before move
+        
+        debug!(
+            "📥 [PROTOCOL] handle_message_bytes: method={:?}, id={:?}",
+            method, id
+        );
+        info!(
+            "🔍 [MESSAGE] Dispatching method '{}' with id {:?} (initialized: {})",
+            method, id, self.initialized.load(Ordering::Relaxed)
+        );
+        
+        // Parse and validate params based on method - single pass!
+        let parsed = raw_msg.parse_params()?;
+        
+        // Handle based on parsed message type
+        let result = match parsed {
+            ParsedMessage::Initialize(params) => {
+                self.handle_initialize_typed(params).await
+            }
+            ParsedMessage::ToolsList => {
+                self.ensure_initialized()?;
+                self.handle_tools_list().await
+            }
+            ParsedMessage::ToolsCall(params) => {
+                self.ensure_initialized()?;
+                self.handle_tool_call_typed(params).await
+            }
+            ParsedMessage::ResourcesList => {
+                self.ensure_initialized()?;
+                // TODO: Implement resources/list
+                Ok(json!({ "resources": [] }))
+            }
+            ParsedMessage::ResourcesRead(params) => {
+                self.ensure_initialized()?;
+                // TODO: Implement resources/read
+                Err(McpError::Internal("Resource read not implemented".into()))
+            }
+            ParsedMessage::PromptsList => {
+                self.ensure_initialized()?;
+                // TODO: Implement prompts/list
+                Ok(json!({ "prompts": [] }))
+            }
+            ParsedMessage::PromptsGet(params) => {
+                self.ensure_initialized()?;
+                // TODO: Implement prompts/get
+                Err(McpError::Internal("Prompt get not implemented".into()))
+            }
+            ParsedMessage::Notification(notification) => {
+                match notification.method.as_str() {
+                    "notifications/cancel" => self.handle_cancel(notification.params.unwrap_or(json!({}))).await,
+                    "notifications/initialized" => self.handle_initialized_notification().await,
+                    "notifications/message" => self.handle_logging_notification(notification.params.unwrap_or(json!({}))).await,
+                    _ => {
+                        error!("[PROTOCOL] Unknown notification: {:?}", notification.method);
+                        Err(McpError::UnknownMethod(notification.method))
+                    }
+                }
+            }
+        };
+        
+        // Build response once
+        match result {
+            Ok(success) => {
+                debug!(
+                    "[PROTOCOL] Success: method={:?}, id={:?}, result={:?}",
+                    method, id, success
+                );
+                if let Some(id_value) = id {
+                    Ok(self.protocol.create_success_response(id_value, success))
+                } else {
+                    Ok(success)
+                }
+            }
+            Err(e) => {
+                error!(
+                    "[PROTOCOL] Error: method={:?}, id={:?}, error={:?}",
+                    method, id, e
+                );
+                let error_response = e.to_json_rpc_error(id);
+                Ok(error_response)
+            }
+        }
+    }
+
+    /// Helper method to ensure the handler is initialized
+    fn ensure_initialized(&self) -> McpResult<()> {
+        if !self.initialized.load(Ordering::Relaxed) {
+            Err(McpError::NotInitialized)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -303,6 +410,74 @@ impl McpProtocolHandlerImpl {
         }
 
         Ok(json!({}))
+    }
+
+    /// Type-safe initialize handler using parsed parameters
+    async fn handle_initialize_typed(&self, params: InitializeParams) -> McpResult<Value> {
+        info!("🔧 [INIT] Processing MCP initialization request (optimized)");
+        info!("   📋 Protocol version: {}", params.protocol_version);
+        info!("   📋 Current initialized state: {}", self.initialized.load(Ordering::Relaxed));
+
+        // Check if already initialized
+        if self.initialized.load(Ordering::Relaxed) {
+            info!("⚠️  [INIT] Already initialized! Allowing re-initialization");
+            // Reset state for clean re-initialization
+            self.initialized.store(false, Ordering::Relaxed);
+            *self.client_info.write().await = None;
+            *self.protocol_version.write().await = None;
+            info!("🔄 [INIT] State reset for re-initialization");
+        }
+
+        // Store client info if provided
+        if let Some(client_info) = params.client_info {
+            info!("   📋 Client info: {:?}", client_info);
+            *self.client_info.write().await = Some(client_info);
+        }
+
+        // Store protocol version
+        *self.protocol_version.write().await = Some(params.protocol_version.clone());
+
+        // Mark as initialized
+        self.initialized.store(true, Ordering::Relaxed);
+        info!("✅ [INIT] MCP session initialized successfully");
+
+        // Return server capabilities and info
+        Ok(json!({
+            "protocolVersion": params.protocol_version,
+            "capabilities": params.capabilities,
+            "serverInfo": {
+                "name": "solidmcp",
+                "version": env!("CARGO_PKG_VERSION")
+            }
+        }))
+    }
+
+    /// Type-safe tool call handler using parsed parameters  
+    async fn handle_tool_call_typed(&self, params: ToolCallParams) -> McpResult<Value> {
+        info!("🔧 [TOOL] Processing tool call: {}", params.name);
+        debug!("   📋 Arguments: {:?}", params.arguments);
+
+        // For now, this is a placeholder implementation
+        // In a real implementation, this would dispatch to registered tools
+        match params.name.as_str() {
+            "echo" => {
+                let message = params.arguments.get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Hello from SolidMCP!");
+                
+                Ok(json!({
+                    "content": [{
+                        "type": "text",
+                        "text": message
+                    }],
+                    "isError": false
+                }))
+            }
+            _ => {
+                error!("🚫 [TOOL] Unknown tool: {}", params.name);
+                Err(McpError::UnknownTool(params.name))
+            }
+        }
     }
 }
 
