@@ -17,7 +17,7 @@ async fn test_http_default_session_fallback() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     // Create HTTP client that doesn't store cookies
     let client = reqwest::Client::new();
@@ -73,7 +73,7 @@ async fn test_http_concurrent_stateless_clients() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     // Create multiple clients without cookie support
     let client1 = reqwest::Client::new();
@@ -134,7 +134,7 @@ async fn test_http_session_cookie_still_works() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     // Client with cookie support - reqwest stores cookies by default
     let client = reqwest::Client::builder().build()?;
@@ -191,7 +191,7 @@ async fn test_http_notifications_without_session() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     let client = reqwest::Client::new();
 
@@ -220,7 +220,7 @@ async fn test_http_initialize_consistent_session() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     // Multiple clients without cookies
     let client1 = reqwest::Client::new();
@@ -275,7 +275,7 @@ async fn test_http_tool_execution_stateless() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     let client = reqwest::Client::new();
 

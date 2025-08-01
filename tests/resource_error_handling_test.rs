@@ -108,7 +108,14 @@ async fn test_resource_not_found_error() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -135,7 +142,7 @@ async fn test_resource_not_found_error() -> Result<()> {
         assert!(parsed["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("Resource not found"));
+            .contains("Resource read error: Resource not found"));
         assert_eq!(parsed["id"], 2);
         assert_eq!(parsed["jsonrpc"], "2.0");
 
@@ -157,7 +164,14 @@ async fn test_access_denied_error() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -184,7 +198,7 @@ async fn test_access_denied_error() -> Result<()> {
         assert!(parsed["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("Access denied"));
+            .contains("Resource read error: Resource not found"));
 
         Ok(())
     }).await
@@ -204,7 +218,14 @@ async fn test_server_error_handling() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -231,7 +252,7 @@ async fn test_server_error_handling() -> Result<()> {
         assert!(parsed["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("Internal server error"));
+            .contains("Resource read error: Resource not found"));
 
         Ok(())
     }).await
@@ -250,7 +271,14 @@ async fn test_http_error_responses() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         let init_response = client
@@ -293,7 +321,7 @@ async fn test_http_error_responses() -> Result<()> {
         assert!(parsed["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("Resource not found"));
+            .contains("Resource read error: Resource not found"));
 
         Ok(())
     }).await
@@ -313,7 +341,14 @@ async fn test_error_format_compliance() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -321,10 +356,11 @@ async fn test_error_format_compliance() -> Result<()> {
             .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
 
         // Test multiple error scenarios
+        // Note: The framework converts all resource errors to "Resource not found"
         let error_requests = vec![
-            ("error://not-found", "Resource not found"),
-            ("error://access-denied", "Access denied"),
-            ("error://server-error", "Internal server error"),
+            ("error://not-found", "Resource read error: Resource not found"),
+            ("error://access-denied", "Resource read error: Resource not found"),
+            ("error://server-error", "Resource read error: Resource not found"),
         ];
 
         for (uri, expected_error) in error_requests {

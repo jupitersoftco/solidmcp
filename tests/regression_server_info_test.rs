@@ -13,7 +13,7 @@ async fn test_server_info_correctness() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     let client = reqwest::Client::new();
 
@@ -56,7 +56,7 @@ async fn test_protocol_version_negotiation() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     let client = reqwest::Client::new();
 
@@ -91,7 +91,7 @@ async fn test_reinitialization_handling() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     let client = reqwest::Client::new();
 
@@ -136,9 +136,9 @@ async fn test_reinitialization_handling() -> Result<()> {
         .await?;
     let reinit_response: Value = response.json().await?;
 
-    // Should fail with "Already initialized" (MCP rejects duplicate initialization)
-    assert!(reinit_response["error"].is_object());
-    assert_eq!(reinit_response["error"]["message"], "Already initialized");
+    // Re-initialization is now allowed (important for reconnecting clients)
+    assert!(reinit_response["result"].is_object());
+    assert!(reinit_response["result"]["protocolVersion"].is_string());
 
     println!("✅ Re-initialization handling works correctly!");
     Ok(())

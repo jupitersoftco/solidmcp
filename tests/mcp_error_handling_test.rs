@@ -186,19 +186,23 @@ async fn test_mcp_large_messages() {
             if let Some(content) = result.get("content") {
                 if let Some(content_array) = content.as_array() {
                     if let Some(first_content) = content_array.first() {
-                        if let Some(text_content) = first_content.get("text") {
-                            let content_str = text_content.as_str().unwrap();
-                            let parsed_content: Value = serde_json::from_str(content_str)?;
-                            if let Some(echo_value) = parsed_content.get("echo") {
-                                let echo_str = echo_value.as_str().unwrap();
-                                assert_eq!(echo_str.len(), large_message.len());
-                                info!(
-                                    "✅ Large message handled successfully ({} bytes)",
-                                    echo_str.len()
-                                );
+                        if let Some(_text_content) = first_content.get("text") {
+                            // Check the structured data instead of parsing the text
+                            if let Some(data) = result.get("data") {
+                                if let Some(echo_value) = data.get("echo") {
+                                    let echo_str = echo_value.as_str().unwrap();
+                                    assert_eq!(echo_str.len(), large_message.len());
+                                    info!(
+                                        "✅ Large message handled successfully ({} bytes)",
+                                        echo_str.len()
+                                    );
+                                } else {
+                                    error!("❌ No echo value in data");
+                                    return Err("No echo value in data".into());
+                                }
                             } else {
-                                error!("❌ No echo value in large message response");
-                                return Err("No echo value in large message response".into());
+                                error!("❌ No data in result");
+                                return Err("No data in result".into());
                             }
                         } else {
                             error!("❌ No text in large message response");

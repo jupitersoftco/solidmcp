@@ -169,7 +169,7 @@ async fn test_tool_with_output_schema() -> Result<()> {
         // Verify the output matches the schema
         let result = &call_response["result"];
         assert_eq!(result["result"], 50.0);
-        assert_eq!(result["formula"], "10 5 multiply = 50");
+        assert_eq!(result["formula"], "10 multiply 5 = 50");
         assert!(result["computed_at"].is_string());
     }
 
@@ -180,13 +180,13 @@ async fn test_tool_with_output_schema() -> Result<()> {
 struct SearchInput {
     query: String,
     limit: Option<u32>,
-    _filters: Option<SearchFilters>,
+    filters: Option<SearchFilters>,
 }
 
 #[derive(JsonSchema, Deserialize)]
 struct SearchFilters {
-    _category: Option<String>,
-    _min_score: Option<f32>,
+    category: Option<String>,
+    min_score: Option<f32>,
 }
 
 #[derive(JsonSchema, Serialize)]
@@ -285,17 +285,21 @@ async fn test_complex_nested_schemas() -> Result<()> {
         // Verify nested input schema (camelCase in protocol)
         let input_schema = &tool["inputSchema"];
         assert!(input_schema["properties"]["filters"].is_object());
-        assert!(input_schema["properties"]["filters"]["properties"]["category"].is_object());
-        assert!(input_schema["properties"]["filters"]["properties"]["min_score"].is_object());
+        // The schema uses $ref for nested types, so we need to check the $defs
+        assert!(input_schema["$defs"]["SearchFilters"].is_object());
+        assert!(input_schema["$defs"]["SearchFilters"]["properties"]["category"].is_object());
+        assert!(input_schema["$defs"]["SearchFilters"]["properties"]["min_score"].is_object());
 
         // Verify nested output schema (camelCase in protocol)
         let output_schema = &tool["outputSchema"];
         assert!(output_schema["properties"]["results"].is_object());
         assert!(output_schema["properties"]["results"]["items"].is_object());
-        assert!(output_schema["properties"]["results"]["items"]["properties"]["id"].is_object());
-        assert!(output_schema["properties"]["results"]["items"]["properties"]["title"].is_object());
-        assert!(output_schema["properties"]["results"]["items"]["properties"]["score"].is_object());
-        assert!(output_schema["properties"]["results"]["items"]["properties"]["snippet"].is_object());
+        // The items use $ref to SearchResult
+        assert!(output_schema["$defs"]["SearchResult"].is_object());
+        assert!(output_schema["$defs"]["SearchResult"]["properties"]["id"].is_object());
+        assert!(output_schema["$defs"]["SearchResult"]["properties"]["title"].is_object());
+        assert!(output_schema["$defs"]["SearchResult"]["properties"]["score"].is_object());
+        assert!(output_schema["$defs"]["SearchResult"]["properties"]["snippet"].is_object());
     }
 
     Ok(())

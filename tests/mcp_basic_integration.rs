@@ -41,8 +41,9 @@ async fn test_mcp_server_basic_functionality() {
 
     let content = echo_result["content"][0]["text"].as_str().unwrap();
     println!("DEBUG: Content from echo tool: '{content}'");
-    let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
-    assert_eq!(parsed["echo"], "Hello from basic integration test!");
+    // The tool returns human-readable text, not JSON. Check the structured data instead.
+    let data = &echo_result["data"];
+    assert_eq!(data["echo"], "Hello from basic integration test!");
     println!("✅ Echo tool validated");
 
     // Test read_file tool with existing file
@@ -58,9 +59,11 @@ async fn test_mcp_server_basic_functionality() {
     let read_result = read_result.unwrap();
 
     let content = read_result["content"][0]["text"].as_str().unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
-    assert_eq!(parsed["file_path"], "Cargo.toml");
-    assert!(parsed["content"].as_str().is_some());
+    println!("DEBUG: Content from read_file tool: '{content}'");
+    // Check the structured data instead of parsing the human-readable text
+    let data = &read_result["data"];
+    assert_eq!(data["file_path"], "Cargo.toml");
+    assert!(data["content"].as_str().is_some());
     println!("✅ Read file tool validated");
 
     // Test read_file tool with non-existent file
@@ -76,8 +79,10 @@ async fn test_mcp_server_basic_functionality() {
     let read_error_result = read_error_result.unwrap();
 
     let content = read_error_result["content"][0]["text"].as_str().unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(content).unwrap();
-    assert!(parsed["error"].as_str().is_some());
+    println!("DEBUG: Content from read_file error: '{content}'");
+    // Check the structured data for error
+    let data = &read_error_result["data"];
+    assert!(data["error"].as_str().is_some());
     println!("✅ Read file error handling validated");
 
     // Test unknown tool

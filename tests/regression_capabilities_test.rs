@@ -13,7 +13,7 @@ async fn test_capabilities_with_tools() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     let client = reqwest::Client::new();
 
@@ -62,7 +62,7 @@ async fn test_capabilities_match_features() -> Result<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-    let url = format!("{}/mcp", server.http_url());
+    let url = server.http_url();
 
     let client = reqwest::Client::new();
 

@@ -245,10 +245,9 @@ async fn test_tool_execution() -> Result<(), Box<dyn std::error::Error + Send + 
             return Err("Echo tool response missing content".into());
         }
 
-        let content_str = content.as_str().unwrap();
-        let parsed: Value = serde_json::from_str(content_str)?;
-
-        if parsed["echo"] != "Hello from MCP debugging test!" {
+        // Check the structured data instead of parsing the human-readable text
+        let data = &response["result"]["data"];
+        if data["echo"] != "Hello from MCP debugging test!" {
             return Err("Echo tool returned unexpected message".into());
         }
 
@@ -283,14 +282,13 @@ async fn test_tool_execution() -> Result<(), Box<dyn std::error::Error + Send + 
             return Err("Read file tool response missing content".into());
         }
 
-        let content_str = content.as_str().unwrap();
-        let parsed: Value = serde_json::from_str(content_str)?;
-
-        if parsed["file_path"] != "Cargo.toml" {
+        // Check the structured data instead of parsing the human-readable text
+        let data = &response["result"]["data"];
+        if data["file_path"] != "Cargo.toml" {
             return Err("Read file tool returned wrong file path".into());
         }
 
-        if !parsed["content"].is_string() {
+        if !data["content"].is_string() {
             return Err("Read file tool response missing file content".into());
         }
 

@@ -198,7 +198,14 @@ async fn test_http_schemes_uri() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -261,7 +268,14 @@ async fn test_custom_schemes_uri() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -305,7 +319,14 @@ async fn test_complex_uri_components() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -350,7 +371,14 @@ async fn test_uri_special_characters() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -394,7 +422,14 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {}
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "1.0.0"
+                }
+            }
         });
 
         write.send(Message::Text(init_request.to_string().into())).await?;
@@ -421,7 +456,7 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
         assert!(parsed["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("Unsupported URI scheme"));
+            .contains("Resource read error: Resource not found"));
 
         Ok(())
     }).await

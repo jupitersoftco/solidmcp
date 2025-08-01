@@ -148,15 +148,19 @@ async fn test_mcp_tools_echo() {
                     assert!(!content_array.is_empty());
 
                     if let Some(text_content) = content_array[0].get("text") {
-                        let text = text_content.as_str().unwrap();
-                        // Parse the JSON content to extract the echo message
-                        let parsed_content: Value = serde_json::from_str(text)?;
-                        if let Some(echo_value) = parsed_content.get("echo") {
-                            assert_eq!(echo_value, "Hello, MCP!");
-                            info!("✅ Echo tool successful: {}", echo_value);
+                        let _text = text_content.as_str().unwrap();
+                        // Check the structured data instead of parsing the text
+                        if let Some(data) = result.get("data") {
+                            if let Some(echo_value) = data.get("echo") {
+                                assert_eq!(echo_value, "Hello, MCP!");
+                                info!("✅ Echo tool successful: {}", echo_value);
+                            } else {
+                                error!("❌ No echo field in data");
+                                return Err("No echo field in data".into());
+                            }
                         } else {
-                            error!("❌ No echo field in response content");
-                            return Err("No echo field in response content".into());
+                            error!("❌ No data in result");
+                            return Err("No data in result".into());
                         }
                     } else {
                         error!("❌ No text content in echo response");
@@ -231,24 +235,27 @@ async fn test_mcp_tools_read_file() {
                     assert!(!content_array.is_empty());
 
                     if let Some(text_content) = content_array[0].get("text") {
-                        let text = text_content.as_str().unwrap();
-                        // Parse the JSON content
-                        let parsed_content: Value = serde_json::from_str(text)?;
+                        let _text = text_content.as_str().unwrap();
+                        // Check the structured data instead of parsing the text
+                        if let Some(data) = result.get("data") {
+                            if let Some(file_path) = data.get("file_path") {
+                                assert_eq!(file_path, "Cargo.toml");
+                                info!("✅ read_file tool successful for: {}", file_path);
+                            } else {
+                                error!("❌ No file_path in data");
+                                return Err("No file_path in data".into());
+                            }
 
-                        if let Some(file_path) = parsed_content.get("file_path") {
-                            assert_eq!(file_path, "Cargo.toml");
-                            info!("✅ read_file tool successful for: {}", file_path);
+                            if let Some(file_content) = data.get("content") {
+                                assert!(file_content.is_string());
+                                info!("✅ File content received successfully");
+                            } else {
+                                error!("❌ No content field in data");
+                                return Err("No content field in data".into());
+                            }
                         } else {
-                            error!("❌ No file_path in response content");
-                            return Err("No file_path in response content".into());
-                        }
-
-                        if let Some(file_content) = parsed_content.get("content") {
-                            assert!(file_content.is_string());
-                            info!("✅ File content received successfully");
-                        } else {
-                            error!("❌ No content field in response");
-                            return Err("No content field in response".into());
+                            error!("❌ No data in result");
+                            return Err("No data in result".into());
                         }
                     } else {
                         error!("❌ No text content in read_file response");
