@@ -3,14 +3,14 @@
 //! Handles WebSocket connections and message processing for the MCP server.
 
 use {
-    super::logging::McpConnectionId,
-    super::logging::McpDebugLogger,
+    super::logging::{McpConnectionId, connection_span, log_connection_upgrade, log_connection_closed,
+                     log_message_received, log_handler_error, log_response_sent, log_response_error, log_parse_error},
     super::shared::McpProtocolEngine,
-    crate::error::McpError,
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
     std::sync::Arc,
-    tracing::{debug, error, info},
+    std::time::{Duration, Instant},
+    tracing::{debug, error, info, Instrument},
     warp::{ws::Message, ws::WebSocket, ws::Ws, Filter, Rejection, Reply},
 };
 
@@ -22,16 +22,16 @@ pub async fn handle_mcp_ws_main(ws: Ws) -> Result<impl Reply, Rejection> {
 
     Ok(ws.on_upgrade(move |websocket| async move {
         let connection_id = McpConnectionId::new();
-        let logger = McpDebugLogger::new(connection_id.clone());
-
-        info!(
-            "🔌 MCP WebSocket connection established: {:?}",
-            connection_id
-        );
-
-        handle_mcp_ws(websocket, logger, protocol_engine.clone()).await;
-
-        info!("🔌 MCP WebSocket connection closed: {:?}", connection_id);
+        let span = connection_span(&connection_id);
+        let start_time = Instant::now();
+        
+        async move {
+            log_connection_upgrade(&connection_id);
+            handle_mcp_ws(websocket, connection_id.clone(), protocol_engine.clone()).await;
+            log_connection_closed(&connection_id, start_time.elapsed());
+        }
+        .instrument(span)
+        .await
     }))
 }
 
@@ -45,16 +45,16 @@ pub fn create_ws_handler(
         .and_then(|ws: Ws, engine: Arc<McpProtocolEngine>| async move {
             Ok::<_, Rejection>(ws.on_upgrade(move |websocket| async move {
                 let connection_id = McpConnectionId::new();
-                let logger = McpDebugLogger::new(connection_id.clone());
-
-                info!(
-                    "🔌 MCP WebSocket connection established: {:?}",
-                    connection_id
-                );
-
-                handle_mcp_ws(websocket, logger, engine.clone()).await;
-
-                info!("🔌 MCP WebSocket connection closed: {:?}", connection_id);
+                let span = connection_span(&connection_id);
+                let start_time = Instant::now();
+                
+                async move {
+                    log_connection_upgrade(&connection_id);
+                    handle_mcp_ws(websocket, connection_id.clone(), engine.clone()).await;
+                    log_connection_closed(&connection_id, start_time.elapsed());
+                }
+                .instrument(span)
+                .await
             }))
         })
 }
@@ -62,21 +62,28 @@ pub fn create_ws_handler(
 /// Handle MCP WebSocket connection
 async fn handle_mcp_ws(
     websocket: WebSocket,
-    logger: McpDebugLogger,
+    connection_id: McpConnectionId,
     protocol_engine: Arc<McpProtocolEngine>,
 ) {
     let (mut ws_sender, mut ws_receiver) = websocket.split();
-    let session_id = format!("ws-{}", logger.connection_id().0);
+    let session_id = format!("ws-{}", connection_id.0);
 
-    info!("{}", logger.fmt_connection_start());
+    info!(
+        connection_id = %connection_id,
+        session_id = %session_id,
+        "Starting MCP message processing loop"
+    );
 
     while let Some(msg_result) = ws_receiver.next().await {
         match msg_result {
             Ok(msg) => {
                 if msg.is_text() {
                     let text = msg.to_str().unwrap_or("");
-                    debug!("{}", logger.fmt_message_received("text", text.len()));
-                    debug!("📥 Raw MCP JSON: {}", text);
+                    log_message_received("text", text.len());
+                    debug!(
+                        raw_json = %text,
+                        "Raw MCP message received"
+                    );
 
                     match serde_json::from_str::<Value>(text) {
                         Ok(message) => {
@@ -88,30 +95,29 @@ async fn handle_mcp_ws(
                                     let response_text = match serde_json::to_string(&response) {
                                         Ok(text) => text,
                                         Err(e) => {
-                                            error!("Failed to serialize response: {}", e);
+                                            error!(
+                                            error = %e,
+                                            "Failed to serialize response"
+                                        );
                                             continue;
                                         }
                                     };
-                                    debug!("📤 Raw MCP Response: {}", response_text);
+                                    debug!(
+                                        raw_response = %response_text,
+                                        "Raw MCP response"
+                                    );
 
                                     if let Err(e) =
                                         ws_sender.send(Message::text(&response_text)).await
                                     {
-                                        error!("{}", logger.fmt_response_error(&e.to_string()));
+                                        log_response_error(&e.to_string());
                                         break;
                                     }
 
-                                    debug!("{}", logger.fmt_response_sent(response_text.len()));
+                                    log_response_sent(response_text.len());
                                 }
                                 Err(e) => {
-                                    error!(
-                                        "{}",
-                                        logger.fmt_message_handling_error(
-                                            "unknown",
-                                            &e.to_string(),
-                                            std::time::Duration::ZERO
-                                        )
-                                    );
+                                    log_handler_error("unknown", &e.to_string(), Duration::ZERO);
 
                                     // Extract the message ID from the original request for proper error response
                                     let message_id =
@@ -129,14 +135,14 @@ async fn handle_mcp_ws(
                                     };
                                     if let Err(e) = ws_sender.send(Message::text(error_text)).await
                                     {
-                                        error!("{}", logger.fmt_response_error(&e.to_string()));
+                                        log_response_error(&e.to_string());
                                         break;
                                     }
                                 }
                             }
                         }
                         Err(e) => {
-                            error!("{}", logger.fmt_parse_error(&e.to_string(), text));
+                            log_parse_error(&e.to_string(), text);
 
                             let error_response = json!({
                                 "jsonrpc": "2.0",
@@ -150,26 +156,29 @@ async fn handle_mcp_ws(
                             let error_text = match serde_json::to_string(&error_response) {
                                 Ok(text) => text,
                                 Err(e) => {
-                                    error!("Failed to serialize parse error response: {}", e);
+                                    error!(
+                                        error = %e,
+                                        "Failed to serialize parse error response"
+                                    );
                                     break;
                                 }
                             };
                             if let Err(e) = ws_sender.send(Message::text(error_text)).await {
-                                error!("{}", logger.fmt_response_error(&e.to_string()));
+                                log_response_error(&e.to_string());
                                 break;
                             }
                         }
                     }
                 } else {
-                    debug!("{}", logger.fmt_message_received("non-text", 0));
+                    log_message_received("non-text", 0);
                 }
             }
             Err(e) => {
-                error!("{}", logger.fmt_response_error(&e.to_string()));
+                log_response_error(&e.to_string());
                 break;
             }
         }
     }
 
-    info!("{}", logger.fmt_connection_closed());
+    // Connection closed logging is handled by the parent span
 }

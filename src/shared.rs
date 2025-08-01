@@ -40,10 +40,11 @@
 use {
     super::protocol_impl::McpProtocolHandlerImpl,
     crate::error::{McpError, McpResult},
+    crate::logging::{generate_request_id, request_span},
     dashmap::DashMap,
     serde_json::{json, Value},
     std::sync::Arc,
-    tracing::{debug, trace},
+    tracing::{debug, trace, Instrument},
 };
 
 /// Core protocol engine for routing MCP messages and managing sessions.
@@ -183,11 +184,18 @@ impl McpProtocolEngine {
         let method = message["method"]
             .as_str()
             .ok_or_else(|| McpError::InvalidParams("Missing method field".to_string()))?;
-        trace!(
-            "Processing MCP method: {} (session: {:?})",
-            method,
-            session_id
-        );
+        let request_id = generate_request_id();
+        let span = request_span(method, &request_id, session_id.as_deref());
+        
+        // Clone method to use in the async block
+        let method_str = method.to_string();
+        
+        let handler_fut = async move {
+            trace!(
+                method = %method_str,
+                session_id = ?session_id,
+                "Processing MCP method"
+            );
 
         // Get or create protocol handler for this session
         let session_key = session_id
@@ -207,7 +215,7 @@ impl McpProtocolEngine {
 
         // If we have a custom handler, delegate to it for supported methods
         if let Some(ref custom_handler) = self.handler {
-            trace!("Delegating method '{}' to custom handler", method);
+            trace!("Delegating method '{}' to custom handler", method_str);
 
             let context = super::handler::McpContext {
                 session_id: session_id.clone(),
@@ -216,7 +224,7 @@ impl McpProtocolEngine {
                 client_info: None,
             };
 
-            match method {
+            match method_str.as_str() {
                 "initialize" => {
                     let params = message
                         .get("params")
@@ -470,6 +478,9 @@ impl McpProtocolEngine {
 
         // Fall back to built-in protocol handler
         handler.handle_message(message).await
+        };
+        
+        handler_fut.instrument(span).await
     }
 
     /// Create an error response following JSON-RPC 2.0 format

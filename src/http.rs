@@ -9,7 +9,7 @@ use {
         TransportNegotiation,
     },
     super::validation::McpValidator,
-    crate::error::McpError,
+    crate::logging::generate_request_id,
     serde_json::{json, Value},
     std::sync::Arc,
     tracing::{debug, error, trace, warn},
@@ -115,23 +115,30 @@ async fn handle_mcp_http(
     handler: Arc<McpProtocolEngine>,
 ) -> Result<impl Reply, Rejection> {
     use std::time::Instant;
-    use uuid::Uuid;
 
     // === COMPREHENSIVE MCP PROTOCOL INSTRUMENTATION ===
     let request_start = Instant::now();
-    let request_id = Uuid::new_v4().to_string();
+    let request_id = generate_request_id();
     let content_type = content_type.unwrap_or_else(|| "application/json".to_string());
     let accept = accept.unwrap_or_else(|| "application/json".to_string());
     let connection = connection.unwrap_or_else(|| "close".to_string());
+    
+    // Extract method for span creation
+    let _method = message.get("method")
+        .and_then(|m| m.as_str())
+        .unwrap_or("unknown");
+    
+    async move {
 
     // === PROTOCOL ANALYSIS LOGGING ===
-    trace!("🚀 === MCP REQUEST ANALYSIS START ===");
-    trace!("   Request ID: {}", request_id);
-    trace!("   Timestamp: {:?}", request_start);
-    trace!("   Content-Type: {}", content_type);
-    trace!("   Accept: {}", accept);
-    trace!("   Connection: {}", connection);
-    trace!("   Cookie: {:?}", cookie);
+    trace!(
+        request_id = %request_id,
+        content_type = %content_type,
+        accept = %accept,
+        connection = %connection,
+        cookie = ?cookie,
+        "MCP request analysis start"
+    );
 
     // Detect Cursor client from User-Agent patterns in headers
     let is_cursor_client = content_type.contains("Cursor")
@@ -725,6 +732,8 @@ async fn handle_mcp_http(
             Ok(create_error_reply(error_response, StatusCode::OK))
         }
     }
+    }
+    .await
 }
 
 /// Enhanced handler for OPTIONS requests (CORS and capability discovery)

@@ -6,7 +6,7 @@
 use {
     std::sync::atomic::{AtomicU64, Ordering},
     std::time::{Duration, Instant, SystemTime, UNIX_EPOCH},
-    tracing::{debug, error, info, instrument, span, trace, warn, Level, Span},
+    tracing::{debug, error, info, span, trace, warn, Level, Span},
     tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter},
     uuid::Uuid,
 };
@@ -33,14 +33,14 @@ pub fn init_tracing() {
 
     if json_format {
         // JSON format for production/structured logging
-        let json_layer = tracing_subscriber::fmt::layer()
+        let fmt_layer = tracing_subscriber::fmt::layer()
             .json()
             .with_current_span(true)
             .with_span_list(true);
 
         tracing_subscriber::registry()
             .with(env_filter)
-            .with(json_layer)
+            .with(fmt_layer)
             .init();
     } else {
         // Human-readable format for development
@@ -50,7 +50,7 @@ pub fn init_tracing() {
             .init();
     }
 
-    info!("Tracing initialized with level: {}", env_filter);
+    info!("Tracing initialized");
 }
 
 /// Generate a unique request ID for tracking
@@ -292,8 +292,7 @@ macro_rules! log_tool_execution {
     };
 }
 
-// Re-export commonly used tracing macros
-pub use tracing::{debug, error, info, trace, warn};
+// Tracing macros are already imported above - no need to re-export
 
 // Backwards compatibility - these will be removed after migration
 #[deprecated(note = "Use structured logging functions instead")]

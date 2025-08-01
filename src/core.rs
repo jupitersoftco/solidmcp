@@ -176,7 +176,7 @@ impl McpServer {
             .map_err(|e| anyhow::anyhow!("Could not bind to {}: {}", addr, e))?;
 
         crate::logging::log_server_ready(&format!("ws://{addr}/mcp and http://{addr}/mcp"));
-        crate::logging::info!(
+        tracing::info!(
             endpoints = ?vec!["WS /mcp (WebSocket upgrade)", "POST /mcp (HTTP JSON-RPC)"],
             "Available endpoints"
         );

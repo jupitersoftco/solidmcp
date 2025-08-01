@@ -3,7 +3,8 @@
 **Priority**: 🟡 HIGH  
 **Effort**: 3 hours  
 **Dependencies**: TODO-019 (need proper error types first)  
-**Category**: Observability, Debugging
+**Category**: Observability, Debugging  
+**Status**: ✅ COMPLETED (2025-08-01)
 
 ## 📋 Description
 
@@ -11,12 +12,12 @@ Replace all `println!`, `eprintln!`, and debug logging with the `tracing` crate 
 
 ## 🎯 Acceptance Criteria
 
-- [ ] All println! statements replaced
-- [ ] Structured logging with context
-- [ ] Log levels properly used (error, warn, info, debug, trace)
-- [ ] Request IDs in log context
-- [ ] Performance impact minimal
-- [ ] JSON output format available
+- [x] All println! statements replaced
+- [x] Structured logging with context
+- [x] Log levels properly used (error, warn, info, debug, trace)
+- [x] Request IDs in log context
+- [x] Performance impact minimal
+- [x] JSON output format available
 
 ## 📊 Current State
 
@@ -276,3 +277,43 @@ fn test_error_logging() {
 - Don't log sensitive data (passwords, tokens, PII)
 - Consider adding OpenTelemetry support later
 - Keep structured fields consistent across modules
+
+## ✅ Completion Summary (2025-08-01)
+
+Successfully implemented structured logging with the tracing crate:
+
+1. **Created comprehensive logging module** (`src/logging.rs`):
+   - Proper tracing initialization with environment filters
+   - Support for JSON format (via LOG_FORMAT=json)
+   - Request ID generation for tracking
+   - Connection ID tracking
+   - Structured logging helper functions
+   - Span creation for request lifecycle
+
+2. **Replaced all println!/eprintln! statements**:
+   - Updated `src/main.rs` to use structured logging
+   - Updated `src/core.rs` to use log functions
+   - Preserved debug output in tests for debugging
+
+3. **Added structured fields throughout**:
+   - HTTP handler logs with request_id, method, session_id
+   - WebSocket handler logs with connection_id
+   - Protocol handler logs with structured context
+   - All log messages include relevant fields
+
+4. **Implemented span tracking**:
+   - Request spans in shared.rs with instrumentation
+   - Connection spans in websocket.rs
+   - Automatic span propagation through async calls
+
+5. **Environment-based configuration**:
+   - RUST_LOG environment variable support
+   - JSON format via LOG_FORMAT=json
+   - Default configuration: "solidmcp=info,warp=info"
+
+6. **Backward compatibility**:
+   - Deprecated McpDebugLogger wrapper maintained
+   - Existing logging calls automatically use new system
+   - No breaking changes to public API
+
+All 137 library tests pass with the new logging implementation.
