@@ -42,15 +42,6 @@ impl ResponseBuilder {
         self
     }
     
-    /// Add custom header
-    pub fn with_header(mut self, name: &str, value: &str) -> Self {
-        if let Ok(header_name) = warp::http::HeaderName::from_bytes(name.as_bytes()) {
-            if let Ok(header_value) = HeaderValue::from_str(value) {
-                self.headers.insert(header_name, header_value);
-            }
-        }
-        self
-    }
     
     /// Build a success response
     pub fn build_success(mut self, body: Value) -> warp::reply::Response {
@@ -117,57 +108,6 @@ impl Default for ResponseBuilder {
     }
 }
 
-/// Create a simple error response
-pub fn create_error_response(
-    error: McpError,
-    message_id: Option<Value>,
-) -> Value {
-    error.to_json_rpc_error(message_id)
-}
-
-/// Create a chunked response with notifications
-pub fn create_chunked_response(
-    primary_response: Value,
-    notifications: Vec<Value>,
-) -> warp::reply::Response {
-    // Combine primary response and notifications
-    let mut responses = vec![primary_response];
-    responses.extend(notifications);
-    
-    // Create multipart response
-    let body = responses.into_iter()
-        .map(|r| serde_json::to_string(&r).unwrap_or_default())
-        .collect::<Vec<_>>()
-        .join("\n");
-    
-    ResponseBuilder::new()
-        .with_chunked_encoding(true)
-        .build_success(json!({ "responses": body }))
-}
-
-/// Apply CORS headers to a response
-pub fn apply_cors_headers(mut response: warp::reply::Response) -> warp::reply::Response {
-    let headers = response.headers_mut();
-    
-    headers.insert(
-        "Access-Control-Allow-Origin",
-        HeaderValue::from_static("*")
-    );
-    headers.insert(
-        "Access-Control-Allow-Methods",
-        HeaderValue::from_static("GET, POST, OPTIONS")
-    );
-    headers.insert(
-        "Access-Control-Allow-Headers",
-        HeaderValue::from_static("Content-Type, Authorization")
-    );
-    headers.insert(
-        "Access-Control-Max-Age",
-        HeaderValue::from_static("86400")
-    );
-    
-    response
-}
 
 #[cfg(test)]
 mod tests {

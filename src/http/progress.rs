@@ -10,14 +10,13 @@ use tracing::{debug, warn};
 /// Handler for progress notifications
 pub struct ProgressHandler {
     sender: mpsc::UnboundedSender<Value>,
-    receiver: mpsc::UnboundedReceiver<Value>,
 }
 
 impl ProgressHandler {
     /// Create a new progress handler
     pub fn new() -> Self {
-        let (sender, receiver) = mpsc::unbounded_channel();
-        Self { sender, receiver }
+        let (sender, _receiver) = mpsc::unbounded_channel();
+        Self { sender }
     }
     
     /// Get the sender for passing to processing functions
@@ -25,73 +24,8 @@ impl ProgressHandler {
         self.sender.clone()
     }
     
-    /// Handle progress notifications with timeout
-    pub async fn handle_with_timeout(
-        mut self,
-        timeout: Duration,
-    ) -> Vec<Value> {
-        let mut notifications = Vec::new();
-        
-        tokio::select! {
-            _ = tokio::time::sleep(timeout) => {
-                warn!(
-                    timeout_ms = timeout.as_millis(),
-                    "Progress handler timeout"
-                );
-            }
-            _ = async {
-                while let Some(notification) = self.receiver.recv().await {
-                    debug!(
-                        notification = ?notification,
-                        "Received progress notification"
-                    );
-                    notifications.push(notification);
-                }
-            } => {
-                debug!(
-                    count = notifications.len(),
-                    "Progress handler completed"
-                );
-            }
-        }
-        
-        notifications
-    }
-    
-    /// Try to receive any pending notifications without blocking
-    pub fn try_receive_all(&mut self) -> Vec<Value> {
-        let mut notifications = Vec::new();
-        
-        while let Ok(notification) = self.receiver.try_recv() {
-            notifications.push(notification);
-        }
-        
-        if !notifications.is_empty() {
-            debug!(
-                count = notifications.len(),
-                "Collected pending notifications"
-            );
-        }
-        
-        notifications
-    }
 }
 
-/// Check if a request has a progress token
-pub fn has_progress_token(message: &Value) -> bool {
-    message.get("params")
-        .and_then(|p| p.get("_meta"))
-        .and_then(|m| m.get("progressToken"))
-        .is_some()
-}
-
-/// Extract progress token from a request
-pub fn extract_progress_token(message: &Value) -> Option<Value> {
-    message.get("params")
-        .and_then(|p| p.get("_meta"))
-        .and_then(|m| m.get("progressToken"))
-        .cloned()
-}
 
 #[cfg(test)]
 mod tests {
