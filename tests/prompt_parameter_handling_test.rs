@@ -6,17 +6,17 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;
 
 // Create a test server with custom prompt provider for parameter testing
-async fn create_test_prompt_server() -> Result<u16> {
+async fn create_test_prompt_server() -> McpResult<u16> {
     use std::sync::Arc;
     use solidmcp::{
-        framework::{McpServerBuilder, PromptProvider},
-        handler::{PromptInfo, PromptContent, PromptMessage, PromptArgument},
+        McpServerBuilder, PromptProvider,
+        PromptInfo, PromptContent, PromptMessage, PromptArgument,
     };
     use async_trait::async_trait;
 
@@ -26,7 +26,7 @@ async fn create_test_prompt_server() -> Result<u16> {
 
     #[async_trait]
     impl PromptProvider<TestContext> for TestPromptProvider {
-        async fn list_prompts(&self, _context: Arc<TestContext>) -> Result<Vec<PromptInfo>> {
+        async fn list_prompts(&self, _context: Arc<TestContext>) -> McpResult<Vec<PromptInfo>> {
             Ok(vec![
                 PromptInfo {
                     name: "simple_template".to_string(),
@@ -84,14 +84,14 @@ async fn create_test_prompt_server() -> Result<u16> {
             name: &str,
             arguments: Option<Value>,
             _context: Arc<TestContext>,
-        ) -> Result<PromptContent> {
+        ) -> McpResult<PromptContent> {
             let args = arguments.unwrap_or_default();
 
             match name {
                 "simple_template" => {
                     let name = args.get("name")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| anyhow::anyhow!("Missing required parameter: name"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: name"))?;
                     
                     Ok(PromptContent {
                         messages: vec![
@@ -105,7 +105,7 @@ async fn create_test_prompt_server() -> Result<u16> {
                 "complex_template" => {
                     let title = args.get("title")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| anyhow::anyhow!("Missing required parameter: title"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: title"))?;
                     
                     let author = args.get("author")
                         .and_then(|v| v.as_str())
@@ -134,7 +134,7 @@ async fn create_test_prompt_server() -> Result<u16> {
                 "numeric_template" => {
                     let count = args.get("count")
                         .and_then(|v| v.as_i64())
-                        .ok_or_else(|| anyhow::anyhow!("Missing or invalid parameter: count"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing or invalid parameter: count"))?;
                     
                     let percentage = args.get("percentage")
                         .and_then(|v| v.as_f64())
@@ -152,13 +152,13 @@ async fn create_test_prompt_server() -> Result<u16> {
                         ],
                     })
                 }
-                _ => Err(anyhow::anyhow!("Prompt not found: {}", name))
+                _ => Err(McpError::InvalidParams(format!("Prompt not found: {}", name)))
             }
         }
     }
 
     let port = find_available_port().await
-        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("Failed to find port: {}", e)))?;
     let context = TestContext;
 
     let mut server = McpServerBuilder::new(context, "test-prompt-server", "1.0.0")
@@ -175,7 +175,7 @@ async fn create_test_prompt_server() -> Result<u16> {
 }
 
 #[tokio::test]
-async fn test_prompt_list_with_arguments() -> Result<()> {
+async fn test_prompt_list_with_arguments() -> McpResult<()> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 
@@ -196,7 +196,7 @@ async fn test_prompt_list_with_arguments() -> Result<()> {
 
     write.send(Message::Text(init_request.to_string().into())).await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
     // List prompts
     let list_request = json!({
@@ -208,7 +208,7 @@ async fn test_prompt_list_with_arguments() -> Result<()> {
 
     write.send(Message::Text(list_request.to_string().into())).await?;
     let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     let prompts = response["result"]["prompts"].as_array().unwrap();
@@ -239,7 +239,7 @@ async fn test_prompt_list_with_arguments() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_simple_parameter_substitution() -> Result<()> {
+async fn test_prompt_simple_parameter_substitution() -> McpResult<()> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 
@@ -260,7 +260,7 @@ async fn test_prompt_simple_parameter_substitution() -> Result<()> {
 
     write.send(Message::Text(init_request.to_string().into())).await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
     // Get prompt with parameter
     let get_request = json!({
@@ -277,7 +277,7 @@ async fn test_prompt_simple_parameter_substitution() -> Result<()> {
 
     write.send(Message::Text(get_request.to_string().into())).await?;
     let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     let result = &response["result"];
@@ -298,7 +298,7 @@ async fn test_prompt_simple_parameter_substitution() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_missing_required_parameter() -> Result<()> {
+async fn test_prompt_missing_required_parameter() -> McpResult<()> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 
@@ -319,7 +319,7 @@ async fn test_prompt_missing_required_parameter() -> Result<()> {
 
     write.send(Message::Text(init_request.to_string().into())).await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
     // Get prompt without required parameter
     let get_request = json!({
@@ -334,7 +334,7 @@ async fn test_prompt_missing_required_parameter() -> Result<()> {
 
     write.send(Message::Text(get_request.to_string().into())).await?;
     let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should return error
@@ -346,7 +346,7 @@ async fn test_prompt_missing_required_parameter() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_numeric_parameters() -> Result<()> {
+async fn test_prompt_numeric_parameters() -> McpResult<()> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 
@@ -367,7 +367,7 @@ async fn test_prompt_numeric_parameters() -> Result<()> {
 
     write.send(Message::Text(init_request.to_string().into())).await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
     // Get prompt with numeric parameters
     let get_request = json!({
@@ -385,7 +385,7 @@ async fn test_prompt_numeric_parameters() -> Result<()> {
 
     write.send(Message::Text(get_request.to_string().into())).await?;
     let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     let result = &response["result"];

@@ -7,11 +7,10 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use std::sync::Arc;
 use async_trait::async_trait;
-use solidmcp::framework::{McpServerBuilder, PromptProvider};
-use solidmcp::handler::{PromptInfo, PromptContent, PromptMessage, PromptArgument};
+use solidmcp::{McpServerBuilder, PromptProvider, PromptInfo, PromptContent, PromptMessage, PromptArgument};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;
@@ -27,7 +26,7 @@ pub struct ComplexPromptProvider;
 
 #[async_trait]
 impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
-    async fn list_prompts(&self, _context: Arc<ComplexTestContext>) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, _context: Arc<ComplexTestContext>) -> McpResult<Vec<PromptInfo>> {
         Ok(vec![
             PromptInfo {
                 name: "multi_role_prompt".to_string(),
@@ -85,7 +84,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
         ])
     }
 
-    async fn get_prompt(&self, name: &str, arguments: Option<Value>, _context: Arc<ComplexTestContext>) -> Result<PromptContent> {
+    async fn get_prompt(&self, name: &str, arguments: Option<Value>, _context: Arc<ComplexTestContext>) -> McpResult<PromptContent> {
         let default_map = serde_json::Map::new();
         let args = arguments.as_ref().and_then(|v| v.as_object()).unwrap_or(&default_map);
 
@@ -93,7 +92,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
             "multi_role_prompt" => {
                 let topic = args.get("topic")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: topic"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: topic"))?;
                 let expertise_level = args.get("expertise_level")
                     .and_then(|v| v.as_str())
                     .unwrap_or("intermediate");
@@ -128,7 +127,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
             "conditional_prompt" => {
                 let task_type = args.get("task_type")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: task_type"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: task_type"))?;
                 let context = args.get("context")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
@@ -152,7 +151,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
                             if context.is_empty() { "" } else { " considering" }, 
                             if context.is_empty() { "content for quality and accuracy" } else { context })
                     ),
-                    _ => return Err(anyhow::anyhow!("Unknown task_type: {}", task_type)),
+                    _ => return Err(McpError::InvalidParams(format!("Unknown task_type: {}", task_type))),
                 };
 
                 Ok(PromptContent {
@@ -171,10 +170,10 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
             "nested_params_prompt" => {
                 let user_name = args.get("user_name")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: user_name"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: user_name"))?;
                 let project_name = args.get("project_name")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: project_name"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: project_name"))?;
                 let deadline = args.get("deadline")
                     .and_then(|v| v.as_str());
 
@@ -197,7 +196,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
                     ],
                 })
             }
-            _ => Err(anyhow::anyhow!("Prompt not found: {}", name))
+            _ => Err(McpError::InvalidParams(format!("Prompt not found: {}", name)))
         }
     }
 }

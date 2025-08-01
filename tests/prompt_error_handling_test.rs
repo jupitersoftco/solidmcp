@@ -6,17 +6,17 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;
 
 // Create a test server with error-prone prompt provider
-async fn create_error_test_server() -> Result<u16> {
+async fn create_error_test_server() -> McpResult<u16> {
     use std::sync::Arc;
     use solidmcp::{
-        framework::{McpServerBuilder, PromptProvider},
-        handler::{PromptInfo, PromptContent, PromptMessage, PromptArgument},
+        McpServerBuilder, PromptProvider,
+        PromptInfo, PromptContent, PromptMessage, PromptArgument,
     };
     use async_trait::async_trait;
 
@@ -26,7 +26,7 @@ async fn create_error_test_server() -> Result<u16> {
 
     #[async_trait]
     impl PromptProvider<TestContext> for ErrorPromptProvider {
-        async fn list_prompts(&self, _context: Arc<TestContext>) -> Result<Vec<PromptInfo>> {
+        async fn list_prompts(&self, _context: Arc<TestContext>) -> McpResult<Vec<PromptInfo>> {
             Ok(vec![
                 PromptInfo {
                     name: "error_prompt".to_string(),
@@ -69,12 +69,12 @@ async fn create_error_test_server() -> Result<u16> {
             name: &str,
             arguments: Option<Value>,
             _context: Arc<TestContext>,
-        ) -> Result<PromptContent> {
+        ) -> McpResult<PromptContent> {
             let args = arguments.unwrap_or_default();
 
             match name {
                 "error_prompt" => {
-                    Err(anyhow::anyhow!("Intentional error for testing"))
+                    Err(McpError::InvalidParams("Intentional error for testing"))
                 }
                 "large_prompt" => {
                     let size = args.get("size")
@@ -96,7 +96,7 @@ async fn create_error_test_server() -> Result<u16> {
                 "special_chars_prompt" => {
                     let text = args.get("text")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| anyhow::anyhow!("Missing required parameter: text"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: text"))?;
                     
                     Ok(PromptContent {
                         messages: vec![
@@ -107,13 +107,13 @@ async fn create_error_test_server() -> Result<u16> {
                         ],
                     })
                 }
-                _ => Err(anyhow::anyhow!("Prompt not found: {}", name))
+                _ => Err(McpError::InvalidParams(format!("Prompt not found: {}", name)))
             }
         }
     }
 
     let port = find_available_port().await
-        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("Failed to find port: {}", e)))?;
     let context = TestContext;
 
     let mut server = McpServerBuilder::new(context, "error-test-server", "1.0.0")
@@ -130,7 +130,7 @@ async fn create_error_test_server() -> Result<u16> {
 }
 
 #[tokio::test]
-async fn test_prompt_provider_error() -> Result<()> {
+async fn test_prompt_provider_error() -> McpResult<()> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 
@@ -151,7 +151,7 @@ async fn test_prompt_provider_error() -> Result<()> {
 
     write.send(Message::Text(init_request.to_string().into())).await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
     // Request prompt that throws error
     let get_request = json!({
@@ -168,7 +168,7 @@ async fn test_prompt_provider_error() -> Result<()> {
 
     write.send(Message::Text(get_request.to_string().into())).await?;
     let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should return error
@@ -180,7 +180,7 @@ async fn test_prompt_provider_error() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_large_content() -> Result<()> {
+async fn test_prompt_large_content() -> McpResult<()> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 
@@ -201,7 +201,7 @@ async fn test_prompt_large_content() -> Result<()> {
 
     write.send(Message::Text(init_request.to_string().into())).await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
     // Request large prompt
     let get_request = json!({
@@ -218,7 +218,7 @@ async fn test_prompt_large_content() -> Result<()> {
 
     write.send(Message::Text(get_request.to_string().into())).await?;
     let response_text = receive_ws_message(&mut read, Duration::from_secs(10)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should succeed despite large size
@@ -239,7 +239,7 @@ async fn test_prompt_large_content() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_special_characters() -> Result<()> {
+async fn test_prompt_special_characters() -> McpResult<()> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 
@@ -260,7 +260,7 @@ async fn test_prompt_special_characters() -> Result<()> {
 
     write.send(Message::Text(init_request.to_string().into())).await?;
     let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
     // Test with special characters including Unicode
     let special_text = "Hello 🌍! Test with \"quotes\", 'apostrophes', & ampersands, <tags>, and newlines\nand tabs\t";
@@ -279,7 +279,7 @@ async fn test_prompt_special_characters() -> Result<()> {
 
     write.send(Message::Text(get_request.to_string().into())).await?;
     let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
-        .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
     let response: Value = serde_json::from_str(&response_text)?;
 
     // Should handle special characters correctly
@@ -302,7 +302,7 @@ async fn test_prompt_special_characters() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_concurrent_requests() -> Result<()> {
+async fn test_prompt_concurrent_requests() -> McpResult<()> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 
@@ -329,7 +329,7 @@ async fn test_prompt_concurrent_requests() -> Result<()> {
 
             write.send(Message::Text(init_request.to_string().into())).await?;
             let _response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-                .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+                .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
             // Request prompt
             let get_request = json!({
@@ -346,7 +346,7 @@ async fn test_prompt_concurrent_requests() -> Result<()> {
 
             write.send(Message::Text(get_request.to_string().into())).await?;
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await
-                .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+                .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
             let response: Value = serde_json::from_str(&response_text)?;
 
             // Should succeed

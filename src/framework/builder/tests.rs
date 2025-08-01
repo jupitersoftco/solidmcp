@@ -203,7 +203,7 @@ mod tests {
                 "error_tool",
                 "A tool that always errors",
                 |_input: EchoInput, _ctx: Arc<TestContext>, _notify| async move {
-                    Err(crate::McpError::Internal("Intentional error".to_string()))
+                    Err::<String, crate::McpError>(crate::McpError::Internal("Intentional error".to_string()))
                 }
             )
             .build()

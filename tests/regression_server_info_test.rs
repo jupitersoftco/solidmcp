@@ -4,15 +4,15 @@
 
 mod mcp_test_helpers;
 
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use serde_json::{json, Value};
 
 /// Test that server info is correctly reported
 #[tokio::test]
-async fn test_server_info_correctness() -> Result<()> {
+async fn test_server_info_correctness() -> McpResult<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     let client = reqwest::Client::new();
@@ -52,10 +52,10 @@ async fn test_server_info_correctness() -> Result<()> {
 
 /// Test protocol version negotiation
 #[tokio::test]
-async fn test_protocol_version_negotiation() -> Result<()> {
+async fn test_protocol_version_negotiation() -> McpResult<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     let client = reqwest::Client::new();
@@ -87,10 +87,10 @@ async fn test_protocol_version_negotiation() -> Result<()> {
 
 /// Test that server handles re-initialization correctly
 #[tokio::test]
-async fn test_reinitialization_handling() -> Result<()> {
+async fn test_reinitialization_handling() -> McpResult<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     let client = reqwest::Client::new();

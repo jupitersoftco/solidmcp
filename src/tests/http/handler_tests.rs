@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::http_handler::HttpMcpHandler;
-    use crate::logging::{McpConnectionId, McpDebugLogger};
+    use crate::logging::McpConnectionId;
     use crate::shared::McpProtocolEngine;
     use serde_json::json;
     use std::sync::Arc;
@@ -11,8 +11,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_http_endpoint_exists() {
-        let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        let _connection_id = McpConnectionId::new();
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -41,8 +40,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_json_returns_error() {
-        let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        let _connection_id = McpConnectionId::new();
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -61,8 +59,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_transport_discovery() {
-        let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        let _connection_id = McpConnectionId::new();
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();

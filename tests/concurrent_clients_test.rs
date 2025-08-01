@@ -2,7 +2,7 @@
 //!
 //! Integration tests for handling multiple concurrent clients
 
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use serde_json::{json, Value};
 use solidmcp::McpServer;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -22,7 +22,7 @@ async fn find_available_port() -> u16 {
 /// Test multiple HTTP clients making concurrent requests
 #[tokio::test]
 #[ignore = "Session isolation bug - shared sessions instead of per-client isolation"]
-async fn test_concurrent_http_clients() -> Result<()> {
+async fn test_concurrent_http_clients() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -142,7 +142,7 @@ async fn test_concurrent_http_clients() -> Result<()> {
 
 /// Test session isolation with concurrent clients
 #[tokio::test]
-async fn test_session_isolation_concurrent() -> Result<()> {
+async fn test_session_isolation_concurrent() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -247,7 +247,7 @@ async fn test_session_isolation_concurrent() -> Result<()> {
 
 /// Test mixed WebSocket and HTTP clients
 #[tokio::test]
-async fn test_mixed_protocol_clients() -> Result<()> {
+async fn test_mixed_protocol_clients() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::{connect_async, tungstenite::Message};
 
@@ -362,7 +362,7 @@ async fn test_mixed_protocol_clients() -> Result<()> {
 
 /// Test rate limiting behavior under load
 #[tokio::test]
-async fn test_high_load_handling() -> Result<()> {
+async fn test_high_load_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -408,7 +408,7 @@ async fn test_high_load_handling() -> Result<()> {
             let _permit = semaphore
                 .acquire()
                 .await
-                .map_err(|e| anyhow::anyhow!("Semaphore error: {}", e))?;
+                .map_err(|e| McpError::InvalidParams(format!("Semaphore error: {}", e)))?;
 
             let request = json!({
                 "jsonrpc": "2.0",
@@ -489,7 +489,7 @@ async fn test_high_load_handling() -> Result<()> {
 
 /// Test client disconnection and reconnection
 #[tokio::test]
-async fn test_client_reconnection_handling() -> Result<()> {
+async fn test_client_reconnection_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 

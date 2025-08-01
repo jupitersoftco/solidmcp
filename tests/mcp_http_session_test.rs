@@ -4,19 +4,19 @@
 
 mod mcp_test_helpers;
 
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use mcp_test_helpers::init_test_tracing;
 use serde_json::{json, Value};
 
 /// Test that HTTP clients without cookie support can use the default session
 #[tokio::test]
-async fn test_http_default_session_fallback() -> Result<()> {
+async fn test_http_default_session_fallback() -> McpResult<()> {
     init_test_tracing();
 
     // Start test server
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     // Create HTTP client that doesn't store cookies
@@ -67,12 +67,12 @@ async fn test_http_default_session_fallback() -> Result<()> {
 
 /// Test that multiple stateless clients can work concurrently
 #[tokio::test]
-async fn test_http_concurrent_stateless_clients() -> Result<()> {
+async fn test_http_concurrent_stateless_clients() -> McpResult<()> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     // Create multiple clients without cookie support
@@ -128,12 +128,12 @@ async fn test_http_concurrent_stateless_clients() -> Result<()> {
 
 /// Test that session cookies are still respected when provided
 #[tokio::test]
-async fn test_http_session_cookie_still_works() -> Result<()> {
+async fn test_http_session_cookie_still_works() -> McpResult<()> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     // Client with cookie support - reqwest stores cookies by default
@@ -185,12 +185,12 @@ async fn test_http_session_cookie_still_works() -> Result<()> {
 
 /// Test error cases when no session exists
 #[tokio::test]
-async fn test_http_notifications_without_session() -> Result<()> {
+async fn test_http_notifications_without_session() -> McpResult<()> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     let client = reqwest::Client::new();
@@ -214,12 +214,12 @@ async fn test_http_notifications_without_session() -> Result<()> {
 
 /// Test that initialize method always uses consistent session
 #[tokio::test]
-async fn test_http_initialize_consistent_session() -> Result<()> {
+async fn test_http_initialize_consistent_session() -> McpResult<()> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     // Multiple clients without cookies
@@ -269,12 +269,12 @@ async fn test_http_initialize_consistent_session() -> Result<()> {
 
 /// Test tool execution with stateless client
 #[tokio::test]
-async fn test_http_tool_execution_stateless() -> Result<()> {
+async fn test_http_tool_execution_stateless() -> McpResult<()> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     let client = reqwest::Client::new();

@@ -5,6 +5,8 @@
 #[cfg(test)]
 use {crate::protocol_impl::McpProtocolHandlerImpl, serde_json::json};
 
+// Test removed - built-in tools were moved to examples
+/*
 #[tokio::test]
 async fn test_mcp_tools_list() {
     let mut handler = McpProtocolHandlerImpl::new();
@@ -48,7 +50,9 @@ async fn test_mcp_tools_list() {
     assert!(tool_names.contains(&"echo"));
     assert!(tool_names.contains(&"read_file"));
 }
+*/
 
+/*
 #[tokio::test]
 async fn test_mcp_tool_call() {
     let mut handler = McpProtocolHandlerImpl::new();
@@ -97,6 +101,7 @@ async fn test_mcp_tool_call() {
     let content = response["result"]["content"][0]["text"].as_str().unwrap();
     assert!(content.contains("Echo: Hello from test!"));
 }
+*/
 
 #[tokio::test]
 async fn test_mcp_tool_call_without_initialization() {

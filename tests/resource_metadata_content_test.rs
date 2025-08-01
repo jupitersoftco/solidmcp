@@ -4,15 +4,15 @@
 //! and various data formats across different transport layers.
 
 use {
-    anyhow::Result,
+    solidmcp::{McpResult, McpError},
     async_trait::async_trait,
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
     std::{sync::Arc, time::Duration},
     tokio_tungstenite::{connect_async, tungstenite::Message},
     solidmcp::{
-        framework::{McpServerBuilder, ResourceProvider},
-        handler::{ResourceContent, ResourceInfo},
+        McpServerBuilder, ResourceProvider,
+        ResourceContent, ResourceInfo,
     },
 };
 
@@ -25,7 +25,7 @@ struct MetadataTestResourceProvider;
 
 #[async_trait]
 impl ResourceProvider<()> for MetadataTestResourceProvider {
-    async fn list_resources(&self, _context: Arc<()>) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: Arc<()>) -> McpResult<Vec<ResourceInfo>> {
         Ok(vec![
             // Text formats
             ResourceInfo {
@@ -96,7 +96,7 @@ impl ResourceProvider<()> for MetadataTestResourceProvider {
         ])
     }
 
-    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> Result<ResourceContent> {
+    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> McpResult<ResourceContent> {
         match uri {
             "data://text/plain" => Ok(ResourceContent {
                 uri: uri.to_string(),
@@ -166,13 +166,13 @@ impl ResourceProvider<()> for MetadataTestResourceProvider {
                     content: large_content,
                 })
             },
-            _ => Err(anyhow::anyhow!("Resource not found: {}", uri)),
+            _ => Err(McpError::InvalidParams(format!("Resource not found: {}", uri))),
         }
     }
 }
 
 /// Create test server with metadata provider
-async fn create_metadata_test_server() -> Result<solidmcp::McpServer> {
+async fn create_metadata_test_server() -> McpResult<solidmcp::McpServer> {
     McpServerBuilder::new((), "metadata-test-server", "1.0.0")
         .with_resource_provider(Box::new(MetadataTestResourceProvider))
         .build()
@@ -181,7 +181,7 @@ async fn create_metadata_test_server() -> Result<solidmcp::McpServer> {
 
 /// Test various MIME types and content formats
 #[tokio::test]
-async fn test_mime_types_and_formats() -> Result<()> {
+async fn test_mime_types_and_formats() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_metadata_test_server("mime_types_test", |server| async move {
@@ -198,7 +198,7 @@ async fn test_mime_types_and_formats() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test different content types
         let test_cases = vec![
@@ -222,7 +222,7 @@ async fn test_mime_types_and_formats() -> Result<()> {
 
             write.send(Message::Text(read_request.to_string().into())).await?;
             let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-                .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+                .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
             let parsed: Value = serde_json::from_str(&response)?;
 
             assert!(parsed["result"].is_object());
@@ -238,7 +238,7 @@ async fn test_mime_types_and_formats() -> Result<()> {
 
 /// Test resource metadata completeness
 #[tokio::test]
-async fn test_resource_metadata() -> Result<()> {
+async fn test_resource_metadata() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_metadata_test_server("metadata_test", |server| async move {
@@ -255,7 +255,7 @@ async fn test_resource_metadata() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // List resources to check metadata
         let list_request = json!({
@@ -267,7 +267,7 @@ async fn test_resource_metadata() -> Result<()> {
 
         write.send(Message::Text(list_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let resources = parsed["result"]["resources"].as_array().unwrap();
@@ -302,7 +302,7 @@ async fn test_resource_metadata() -> Result<()> {
 
 /// Test large content handling
 #[tokio::test]
-async fn test_large_content_handling() -> Result<()> {
+async fn test_large_content_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_metadata_test_server("large_content_test", |server| async move {
@@ -319,7 +319,7 @@ async fn test_large_content_handling() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Request large content
         let read_request = json!({
@@ -333,7 +333,7 @@ async fn test_large_content_handling() -> Result<()> {
 
         write.send(Message::Text(read_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(10)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         assert!(parsed["result"].is_object());
@@ -352,7 +352,7 @@ async fn test_large_content_handling() -> Result<()> {
 
 /// Test content with Unicode and special characters
 #[tokio::test]
-async fn test_unicode_content() -> Result<()> {
+async fn test_unicode_content() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_metadata_test_server("unicode_test", |server| async move {
@@ -369,7 +369,7 @@ async fn test_unicode_content() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Request content with Unicode
         let read_request = json!({
@@ -383,7 +383,7 @@ async fn test_unicode_content() -> Result<()> {
 
         write.send(Message::Text(read_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -399,9 +399,9 @@ async fn test_unicode_content() -> Result<()> {
 }
 
 // Helper function to create metadata test server
-async fn start_metadata_test_server() -> Result<u16> {
+async fn start_metadata_test_server() -> McpResult<u16> {
     let port = find_available_port().await
-        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("Failed to find port: {}", e)))?;
     let mut server = create_metadata_test_server().await?;
     
     tokio::spawn(async move {
@@ -418,10 +418,10 @@ async fn start_metadata_test_server() -> Result<u16> {
 async fn with_metadata_test_server<F, Fut, T>(
     test_name: &str,
     test_fn: F,
-) -> Result<T>
+) -> McpResult<T>
 where
     F: FnOnce(McpTestServer) -> Fut,
-    Fut: std::future::Future<Output = Result<T>>,
+    Fut: std::future::Future<Output = anyhow::Result<T>>,
 {
     tracing::info!("🚀 Starting MCP metadata test server for: {}", test_name);
 

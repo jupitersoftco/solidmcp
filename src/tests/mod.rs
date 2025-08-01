@@ -18,12 +18,12 @@ pub mod transport_integration_tests;
 
 #[cfg(test)]
 mod integration_tests {
-    use crate::logging::{McpConnectionId, McpDebugLogger};
+    use crate::logging::McpConnectionId;
     use crate::protocol::McpProtocol;
     use crate::protocol_impl::McpProtocolHandlerImpl;
     use serde_json::json;
     use std::io::Write;
-    use tempfile::NamedTempFile;
+    // Removed tempfile usage
 
     #[tokio::test]
     async fn test_mcp_server_creation() {

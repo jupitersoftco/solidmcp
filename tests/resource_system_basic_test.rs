@@ -4,15 +4,15 @@
 //! and basic protocol compliance across HTTP and WebSocket transports.
 
 use {
-    anyhow::Result,
     async_trait::async_trait,
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
     std::{sync::Arc, time::Duration},
     tokio_tungstenite::{connect_async, tungstenite::Message},
     solidmcp::{
-        framework::{McpServerBuilder, ResourceProvider},
-        handler::{ResourceContent, ResourceInfo},
+        McpServerBuilder, ResourceProvider,
+        ResourceContent, ResourceInfo,
+        McpResult, McpError,
     },
 };
 
@@ -54,11 +54,11 @@ impl TestResourceProvider {
 
 #[async_trait]
 impl ResourceProvider<()> for TestResourceProvider {
-    async fn list_resources(&self, _context: Arc<()>) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: Arc<()>) -> McpResult<Vec<ResourceInfo>> {
         Ok(self.resources.clone())
     }
 
-    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> Result<ResourceContent> {
+    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> McpResult<ResourceContent> {
         match uri {
             "test://simple" => Ok(ResourceContent {
                 uri: uri.to_string(),
@@ -75,13 +75,13 @@ impl ResourceProvider<()> for TestResourceProvider {
                 mime_type: Some("text/plain".to_string()),
                 content: "File content from disk".to_string(),
             }),
-            _ => Err(anyhow::anyhow!("Resource not found: {}", uri)),
+            _ => Err(McpError::UnknownResource(uri.to_string())),
         }
     }
 }
 
 /// Create a test server with resource provider
-async fn create_resource_test_server(context: ()) -> Result<solidmcp::McpServer> {
+async fn create_resource_test_server(context: ()) -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
     McpServerBuilder::new(context, "resource-test-server", "1.0.0")
         .with_resource_provider(Box::new(TestResourceProvider::new()))
         .build()
@@ -90,7 +90,7 @@ async fn create_resource_test_server(context: ()) -> Result<solidmcp::McpServer>
 
 /// Test basic resources/list functionality via WebSocket
 #[tokio::test]
-async fn test_websocket_resources_list() -> Result<()> {
+async fn test_websocket_resources_list() -> anyhow::Result<()> {
     init_test_tracing();
 
     with_mcp_test_server("resource_list_ws", |server| async move {
@@ -148,7 +148,7 @@ async fn test_websocket_resources_list() -> Result<()> {
 
 /// Test basic resources/read functionality via WebSocket
 #[tokio::test]
-async fn test_websocket_resources_read() -> Result<()> {
+async fn test_websocket_resources_read() -> anyhow::Result<()> {
     init_test_tracing();
 
     with_mcp_test_server("resource_read_ws", |server| async move {
@@ -205,7 +205,7 @@ async fn test_websocket_resources_read() -> Result<()> {
 
 /// Test resources functionality via HTTP
 #[tokio::test]
-async fn test_http_resources_list() -> Result<()> {
+async fn test_http_resources_list() -> anyhow::Result<()> {
     init_test_tracing();
 
     with_mcp_test_server("resource_list_http", |server| async move {
@@ -274,7 +274,7 @@ async fn test_http_resources_list() -> Result<()> {
 
 /// Test resource not found error handling
 #[tokio::test]
-async fn test_resource_not_found() -> Result<()> {
+async fn test_resource_not_found() -> anyhow::Result<()> {
     init_test_tracing();
 
     with_mcp_test_server("resource_not_found", |server| async move {
@@ -320,7 +320,7 @@ async fn test_resource_not_found() -> Result<()> {
 }
 
 // Override the test server creation to use our resource provider
-async fn start_test_server_with_resources() -> Result<u16> {
+async fn start_test_server_with_resources() -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await
         .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
     let mut server = create_resource_test_server(()).await?;
@@ -339,10 +339,10 @@ async fn start_test_server_with_resources() -> Result<u16> {
 async fn with_mcp_test_server<F, Fut, T>(
     test_name: &str,
     test_fn: F,
-) -> Result<T>
+) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
 where
     F: FnOnce(McpTestServer) -> Fut,
-    Fut: std::future::Future<Output = Result<T>>,
+    Fut: std::future::Future<Output = anyhow::Result<T>>,
 {
     tracing::info!("🚀 Starting MCP resource test server for: {}", test_name);
 

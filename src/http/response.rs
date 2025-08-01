@@ -3,7 +3,7 @@
 //! Functions for building HTTP responses with proper headers and formatting.
 
 use crate::error::McpError;
-use serde_json::{json, Value};
+use serde_json::Value;
 use tracing::debug;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 use warp::reply;
@@ -112,6 +112,7 @@ impl Default for ResponseBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     
     #[test]
     fn test_response_builder_basic() {
@@ -155,14 +156,5 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK); // JSON-RPC errors use 200
     }
     
-    #[test]
-    fn test_create_error_response() {
-        let error = McpError::InvalidParams("Invalid Request".to_string());
-        let response = create_error_response(error, Some(json!(1)));
-        
-        assert_eq!(response["jsonrpc"], "2.0");
-        assert_eq!(response["id"], 1);
-        assert_eq!(response["error"]["code"], -32602);
-        assert!(response["error"]["message"].as_str().unwrap().contains("Invalid Request"));
-    }
+    // Test removed - create_error_response function was removed
 }

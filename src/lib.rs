@@ -60,21 +60,26 @@ mod tests;
 pub use crate::server::McpServer;
 
 // Framework API (preferred)
-pub use crate::framework::{McpServerBuilder, PromptProvider, ResourceProvider};
+pub use crate::framework::{McpServerBuilder, PromptProvider, ResourceProvider, NotificationCtx};
 
 // Handler trait and context
 pub use crate::handler::{McpHandler, McpContext};
 
-// Type definitions
+// Type definitions from types module
 pub use crate::types::{
-    PromptArgument, PromptContent, PromptDefinition,
-    PromptInfo, PromptMessage, ResourceContent, ResourceDefinition, ResourceInfo,
-    ToolDefinition, 
+    PromptDefinition, ResourceDefinition,
+};
+
+// Handler types (these are what PromptProvider/ResourceProvider expect)
+// TODO: Unify with types module in future
+pub use crate::handler::{
+    PromptArgument, PromptContent, PromptInfo, PromptMessage,
+    ResourceContent, ResourceInfo,
 };
 
 // Re-export from handler module (will be moved to types in future)
 pub use crate::handler::{
-    LogLevel, McpNotification, TypedToolDefinition,
+    LogLevel, McpNotification, TypedToolDefinition, ToolDefinition,
 };
 
 // Response types

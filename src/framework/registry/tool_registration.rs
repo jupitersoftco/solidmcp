@@ -6,7 +6,6 @@
 use crate::{
     content_types::McpResponse,
     handler::ToolDefinition,
-    typed_response::McpToolOutput,
 };
 use crate::error::McpResult;
 use schemars::JsonSchema;

@@ -1,11 +1,11 @@
 mod mcp_test_helpers;
 
 use {
-    anyhow::Result,
+    solidmcp::{McpResult, McpError},
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
     serde_json::{json, Value},
-    solidmcp::framework::{McpServerBuilder, NotificationCtx},
+    solidmcp::{McpServerBuilder, NotificationCtx},
     std::sync::Arc,
 };
 
@@ -31,7 +31,7 @@ struct CalculateOutput {
 }
 
 #[tokio::test]
-async fn test_tool_with_output_schema() -> Result<()> {
+async fn test_tool_with_output_schema() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create a server with a tool that has both input and output schemas
     let context = TestContext {
         _name: "test".to_string(),
@@ -50,11 +50,11 @@ async fn test_tool_with_output_schema() -> Result<()> {
                     "multiply" => input.a * input.b,
                     "divide" => {
                         if input.b == 0.0 {
-                            return Err(anyhow::anyhow!("Division by zero"));
+                            return Err(McpError::InvalidParams("Division by zero"));
                         }
                         input.a / input.b
                     }
-                    _ => return Err(anyhow::anyhow!("Unknown operation: {}", input.operation)),
+                    _ => return Err(McpError::InvalidParams(format!("Unknown operation: {}", input.operation))),
                 };
 
                 Ok(CalculateOutput {
@@ -107,7 +107,7 @@ async fn test_tool_with_output_schema() -> Result<()> {
         }
         
         let init_response: Value = serde_json::from_str(&response_text)
-            .map_err(|e| anyhow::anyhow!("Failed to parse init response: {} - Body: {}", e, response_text))?;
+            .map_err(|e| McpError::InvalidParams(format!("Failed to parse init response: {} - Body: {}", e, response_text)))?;
         assert_eq!(init_response["result"]["protocolVersion"], MCP_VERSION_LATEST);
 
         // List tools to verify output schema is included
@@ -205,7 +205,7 @@ struct SearchResult {
 }
 
 #[tokio::test]
-async fn test_complex_nested_schemas() -> Result<()> {
+async fn test_complex_nested_schemas() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Test with more complex nested types
     let context = TestContext {
         _name: "search-test".to_string(),

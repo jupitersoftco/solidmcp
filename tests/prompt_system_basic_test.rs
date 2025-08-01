@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 
 mod mcp_test_helpers;
 mod prompt_test_helpers;

@@ -245,22 +245,6 @@ mod tests {
         assert_eq!(json["data"], data);
     }
 
-    #[test]
-    fn test_to_mcp_response_string() {
-        let response = "Hello".to_mcp_response();
-        assert_eq!(response.content.len(), 1);
-        assert!(matches!(response.content[0], McpContent::Text { ref text } if text == "Hello"));
-    }
-
-    #[test]
-    fn test_to_mcp_response_json_with_results() {
-        let data = json!({"results": [1, 2], "status": "ok"});
-        let response = data.to_mcp_response();
-        
-        // Should extract meaningful text from JSON
-        let content_json = serde_json::to_value(&response.content[0]).unwrap();
-        let text = content_json["text"].as_str().unwrap();
-        assert!(text.contains("2 results") || text.contains("ok"));
-        assert!(response.data.is_some());
-    }
+    // Tests removed - to_mcp_response trait was removed during cleanup
+    // Use McpResponse constructors directly instead
 }

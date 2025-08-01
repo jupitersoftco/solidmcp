@@ -4,14 +4,14 @@
 //! in resource URI processing across different transport layers.
 
 use {
-    anyhow::Result,
+    solidmcp::{McpResult, McpError},
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
     std::{sync::Arc, time::Duration},
     tokio_tungstenite::{connect_async, tungstenite::Message},
     solidmcp::{
-        framework::{McpServerBuilder, ResourceProvider},
-        handler::{ResourceContent, ResourceInfo},
+        McpServerBuilder, ResourceProvider,
+        ResourceContent, ResourceInfo,
     },
 };
 
@@ -24,7 +24,7 @@ struct UriValidationResourceProvider;
 
 #[async_trait::async_trait]
 impl ResourceProvider<()> for UriValidationResourceProvider {
-    async fn list_resources(&self, _context: Arc<()>) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: Arc<()>) -> McpResult<Vec<ResourceInfo>> {
         Ok(vec![
             // Standard schemes
             ResourceInfo {
@@ -81,7 +81,7 @@ impl ResourceProvider<()> for UriValidationResourceProvider {
         ])
     }
 
-    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> Result<ResourceContent> {
+    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> McpResult<ResourceContent> {
         // Validate and process different URI schemes
         let content = match uri {
             uri if uri.starts_with("file://") => {
@@ -105,7 +105,7 @@ impl ResourceProvider<()> for UriValidationResourceProvider {
             uri if uri.contains("%20") => {
                 format!("Content with encoded chars: {}", uri)
             }
-            _ => return Err(anyhow::anyhow!("Unsupported URI scheme: {}", uri)),
+            _ => return Err(McpError::InvalidParams(format!("Unsupported URI scheme: {}", uri))),
         };
 
         // Determine MIME type based on URI
@@ -128,7 +128,7 @@ impl ResourceProvider<()> for UriValidationResourceProvider {
 }
 
 /// Create test server with URI validation provider
-async fn create_uri_test_server() -> Result<solidmcp::McpServer> {
+async fn create_uri_test_server() -> McpResult<solidmcp::McpServer> {
     McpServerBuilder::new((), "uri-test-server", "1.0.0")
         .with_resource_provider(Box::new(UriValidationResourceProvider))
         .build()
@@ -137,7 +137,7 @@ async fn create_uri_test_server() -> Result<solidmcp::McpServer> {
 
 /// Test file:// scheme URI handling
 #[tokio::test]
-async fn test_file_scheme_uri() -> Result<()> {
+async fn test_file_scheme_uri() -> McpResult<()> {
     init_test_tracing();
 
     with_mcp_uri_test_server("file_scheme_test", |server| async move {
@@ -157,7 +157,7 @@ async fn test_file_scheme_uri() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test file:// URI
         let read_request = json!({
@@ -171,7 +171,7 @@ async fn test_file_scheme_uri() -> Result<()> {
 
         write.send(Message::Text(read_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         assert!(parsed["result"].is_object());
@@ -186,7 +186,7 @@ async fn test_file_scheme_uri() -> Result<()> {
 
 /// Test HTTP/HTTPS scheme URI handling
 #[tokio::test]
-async fn test_http_schemes_uri() -> Result<()> {
+async fn test_http_schemes_uri() -> McpResult<()> {
     init_test_tracing();
 
     with_mcp_uri_test_server("http_schemes_test", |server| async move {
@@ -210,7 +210,7 @@ async fn test_http_schemes_uri() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test HTTP URI
         let http_request = json!({
@@ -224,7 +224,7 @@ async fn test_http_schemes_uri() -> Result<()> {
 
         write.send(Message::Text(http_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -243,7 +243,7 @@ async fn test_http_schemes_uri() -> Result<()> {
 
         write.send(Message::Text(https_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -256,7 +256,7 @@ async fn test_http_schemes_uri() -> Result<()> {
 
 /// Test custom scheme URI handling
 #[tokio::test]
-async fn test_custom_schemes_uri() -> Result<()> {
+async fn test_custom_schemes_uri() -> McpResult<()> {
     init_test_tracing();
 
     with_mcp_uri_test_server("custom_schemes_test", |server| async move {
@@ -280,7 +280,7 @@ async fn test_custom_schemes_uri() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test custom scheme
         let custom_request = json!({
@@ -294,7 +294,7 @@ async fn test_custom_schemes_uri() -> Result<()> {
 
         write.send(Message::Text(custom_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -307,7 +307,7 @@ async fn test_custom_schemes_uri() -> Result<()> {
 
 /// Test complex URI with all components
 #[tokio::test]
-async fn test_complex_uri_components() -> Result<()> {
+async fn test_complex_uri_components() -> McpResult<()> {
     init_test_tracing();
 
     with_mcp_uri_test_server("complex_uri_test", |server| async move {
@@ -331,7 +331,7 @@ async fn test_complex_uri_components() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test complex URI
         let complex_uri = "scheme://host:8080/path?query=value#fragment";
@@ -346,7 +346,7 @@ async fn test_complex_uri_components() -> Result<()> {
 
         write.send(Message::Text(complex_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -359,7 +359,7 @@ async fn test_complex_uri_components() -> Result<()> {
 
 /// Test URI with special characters and encoding
 #[tokio::test]
-async fn test_uri_special_characters() -> Result<()> {
+async fn test_uri_special_characters() -> McpResult<()> {
     init_test_tracing();
 
     with_mcp_uri_test_server("special_chars_test", |server| async move {
@@ -383,7 +383,7 @@ async fn test_uri_special_characters() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test URL-encoded characters
         let encoded_request = json!({
@@ -397,7 +397,7 @@ async fn test_uri_special_characters() -> Result<()> {
 
         write.send(Message::Text(encoded_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         let content = &parsed["result"]["contents"][0];
@@ -410,7 +410,7 @@ async fn test_uri_special_characters() -> Result<()> {
 
 /// Test unsupported URI scheme error handling
 #[tokio::test]
-async fn test_unsupported_uri_scheme() -> Result<()> {
+async fn test_unsupported_uri_scheme() -> McpResult<()> {
     init_test_tracing();
 
     with_mcp_uri_test_server("unsupported_scheme_test", |server| async move {
@@ -434,7 +434,7 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test unsupported scheme
         let unsupported_request = json!({
@@ -448,7 +448,7 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
 
         write.send(Message::Text(unsupported_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Should return error for unsupported scheme
@@ -463,9 +463,9 @@ async fn test_unsupported_uri_scheme() -> Result<()> {
 }
 
 // Helper function to create URI test server
-async fn start_uri_test_server() -> Result<u16> {
+async fn start_uri_test_server() -> McpResult<u16> {
     let port = find_available_port().await
-        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("Failed to find port: {}", e)))?;
     let mut server = create_uri_test_server().await?;
     
     tokio::spawn(async move {
@@ -482,10 +482,10 @@ async fn start_uri_test_server() -> Result<u16> {
 async fn with_mcp_uri_test_server<F, Fut, T>(
     test_name: &str,
     test_fn: F,
-) -> Result<T>
+) -> McpResult<T>
 where
     F: FnOnce(McpTestServer) -> Fut,
-    Fut: std::future::Future<Output = Result<T>>,
+    Fut: std::future::Future<Output = anyhow::Result<T>>,
 {
     tracing::info!("🚀 Starting MCP URI test server for: {}", test_name);
 

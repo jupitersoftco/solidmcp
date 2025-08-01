@@ -7,11 +7,11 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use std::sync::Arc;
 use async_trait::async_trait;
-use solidmcp::framework::{McpServerBuilder, PromptProvider};
-use solidmcp::handler::{PromptInfo, PromptContent, PromptMessage, PromptArgument};
+use solidmcp::McpServerBuilder, PromptProvider;
+use solidmcp::PromptInfo, PromptContent, PromptMessage, PromptArgument;
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;
@@ -28,7 +28,7 @@ pub struct ConcurrentPromptProvider;
 
 #[async_trait]
 impl PromptProvider<ConcurrentTestContext> for ConcurrentPromptProvider {
-    async fn list_prompts(&self, context: Arc<ConcurrentTestContext>) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, context: Arc<ConcurrentTestContext>) -> McpResult<Vec<PromptInfo>> {
         // Increment request counter to track concurrent access
         context.request_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         
@@ -61,7 +61,7 @@ impl PromptProvider<ConcurrentTestContext> for ConcurrentPromptProvider {
         ])
     }
 
-    async fn get_prompt(&self, name: &str, arguments: Option<Value>, context: Arc<ConcurrentTestContext>) -> Result<PromptContent> {
+    async fn get_prompt(&self, name: &str, arguments: Option<Value>, context: Arc<ConcurrentTestContext>) -> McpResult<PromptContent> {
         // Increment request counter
         context.request_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         
@@ -72,7 +72,7 @@ impl PromptProvider<ConcurrentTestContext> for ConcurrentPromptProvider {
             "concurrent_prompt" => {
                 let data = args.get("data")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: data"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: data"))?;
 
                 // Simulate some processing time
                 tokio::time::sleep(Duration::from_millis(5)).await;
@@ -107,7 +107,7 @@ impl PromptProvider<ConcurrentTestContext> for ConcurrentPromptProvider {
                     ],
                 })
             }
-            _ => Err(anyhow::anyhow!("Prompt not found: {}", name))
+            _ => Err(McpError::InvalidParams(format!("Prompt not found: {}", name)))
         }
     }
 }

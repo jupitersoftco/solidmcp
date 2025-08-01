@@ -10,7 +10,7 @@ mod tests {
     /// Test error response format compliance with JSON-RPC 2.0
     #[tokio::test]
     async fn test_error_response_format() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Try to call a method before initialization
         let premature_call = json!({
@@ -37,7 +37,7 @@ mod tests {
     /// Test standard JSON-RPC error codes
     #[tokio::test]
     async fn test_standard_error_codes() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Test Method not found (-32601)
         let unknown_method = json!({
@@ -83,7 +83,7 @@ mod tests {
     /// Test error handling for tool execution failures
     #[tokio::test]
     async fn test_tool_execution_errors() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Initialize
         let init = json!({
@@ -119,7 +119,7 @@ mod tests {
     /// Test error propagation from nested calls
     #[tokio::test]
     async fn test_nested_error_propagation() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Initialize
         let init = json!({
@@ -152,7 +152,7 @@ mod tests {
     /// Test handling of initialization - now allows re-initialization
     #[tokio::test]
     async fn test_initialization_errors() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Try to initialize twice
         let init = json!({
@@ -200,7 +200,7 @@ mod tests {
     /// Test error recovery and state consistency
     #[tokio::test]
     async fn test_error_recovery() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Initialize
         let init = json!({
@@ -240,7 +240,7 @@ mod tests {
     /// Test handling of panics (should be converted to errors)
     #[tokio::test]
     async fn test_panic_handling() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // This test would require injecting a panic-inducing condition
         // For now, we test that very malformed input doesn't crash
@@ -259,7 +259,7 @@ mod tests {
     /// Test timeout and cancellation handling
     #[tokio::test]
     async fn test_cancellation_handling() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Send a cancel notification
         let cancel = json!({
@@ -278,7 +278,7 @@ mod tests {
     /// Test resource not found errors
     #[tokio::test]
     async fn test_resource_errors() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Initialize
         let init = json!({
@@ -309,7 +309,7 @@ mod tests {
     /// Test handling of circular references or deeply nested data
     #[tokio::test]
     async fn test_deeply_nested_data() {
-        let mut handler = McpProtocolHandlerImpl::new();
+        let handler = McpProtocolHandlerImpl::new();
 
         // Create deeply nested params
         let mut nested = json!({"level": 0});

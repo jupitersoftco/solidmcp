@@ -4,12 +4,12 @@
 
 mod mcp_test_helpers;
 
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use async_trait::async_trait;
 use mcp_test_helpers::init_test_tracing;
 use serde_json::{json, Value};
 use solidmcp::{
-    handler::{McpContext, McpHandler, ToolDefinition},
+    McpContext, McpHandler, ToolDefinition,
     McpServer,
 };
 use std::sync::Arc;
@@ -19,7 +19,7 @@ struct TestMcpHandler;
 
 #[async_trait]
 impl McpHandler for TestMcpHandler {
-    async fn list_tools(&self, _context: &McpContext) -> Result<Vec<ToolDefinition>> {
+    async fn list_tools(&self, _context: &McpContext) -> McpResult<Vec<ToolDefinition>> {
         Ok(vec![ToolDefinition {
             name: "test_tool".to_string(),
             description: "A test tool for trait verification".to_string(),
@@ -44,7 +44,7 @@ impl McpHandler for TestMcpHandler {
         name: &str,
         arguments: Value,
         _context: &McpContext,
-    ) -> Result<Value> {
+    ) -> McpResult<Value> {
         match name {
             "test_tool" => {
                 let message = arguments["message"].as_str().unwrap_or("default");
@@ -52,13 +52,13 @@ impl McpHandler for TestMcpHandler {
                     "response": format!("Processed: {}", message)
                 }))
             }
-            _ => Err(anyhow::anyhow!("Unknown tool: {}", name)),
+            _ => Err(McpError::InvalidParams(format!("Unknown tool: {}", name))),
         }
     }
 }
 
 #[tokio::test]
-async fn test_custom_trait_implementation() -> Result<()> {
+async fn test_custom_trait_implementation() -> McpResult<()> {
     init_test_tracing();
 
     // Create server with custom handler
@@ -68,7 +68,7 @@ async fn test_custom_trait_implementation() -> Result<()> {
     // Start server on random port
     let port = mcp_test_helpers::find_available_port()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
 
     tokio::spawn(async move {
         server.start(port).await.unwrap();
@@ -128,7 +128,7 @@ async fn test_custom_trait_implementation() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_trait_error_handling() -> Result<()> {
+async fn test_trait_error_handling() -> McpResult<()> {
     init_test_tracing();
 
     // Create server with custom handler
@@ -138,7 +138,7 @@ async fn test_trait_error_handling() -> Result<()> {
     // Start server on random port
     let port = mcp_test_helpers::find_available_port()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
 
     tokio::spawn(async move {
         server.start(port).await.unwrap();

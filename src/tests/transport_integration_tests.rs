@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::http_handler::HttpMcpHandler;
-    use crate::logging::{McpConnectionId, McpDebugLogger};
+    use crate::logging::McpConnectionId;
     use crate::shared::McpProtocolEngine;
     use crate::transport::{
         cors_headers, TransportCapabilities, TransportInfo, TransportNegotiation, TransportType,
@@ -16,7 +16,7 @@ mod tests {
     #[tokio::test]
     async fn test_cors_options_request() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -51,7 +51,7 @@ mod tests {
     #[tokio::test]
     async fn test_websocket_client_transport_detection() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -84,7 +84,7 @@ mod tests {
     #[tokio::test]
     async fn test_sse_client_fallback_to_http() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -115,7 +115,7 @@ mod tests {
     #[tokio::test]
     async fn test_curl_http_client_detection() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -146,7 +146,7 @@ mod tests {
     #[tokio::test]
     async fn test_post_request_with_cors_headers() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -327,7 +327,7 @@ mod tests {
     #[tokio::test]
     async fn test_malformed_websocket_upgrade_handling() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -352,7 +352,7 @@ mod tests {
     #[tokio::test]
     async fn test_multiple_origin_cors_handling() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();
@@ -381,7 +381,7 @@ mod tests {
     #[tokio::test]
     async fn test_client_info_extraction_and_logging() {
         let connection_id = McpConnectionId::new();
-        let _logger = McpDebugLogger::new(connection_id);
+        // Logger no longer needed - using structured logging via tracing
         let shared_handler = Arc::new(McpProtocolEngine::new());
         let http_handler = HttpMcpHandler::new(shared_handler);
         let routes = http_handler.route();

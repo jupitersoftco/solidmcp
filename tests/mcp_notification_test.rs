@@ -2,11 +2,11 @@
 //!
 //! Tests that verify notification functionality using trait-based handlers
 
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use solidmcp::{
-    handler::{McpContext, McpHandler, ToolDefinition},
+    McpContext, McpHandler, ToolDefinition,
     McpServer,
 };
 use std::sync::Arc;
@@ -17,7 +17,7 @@ struct NotificationTestHandler;
 
 #[async_trait]
 impl McpHandler for NotificationTestHandler {
-    async fn list_tools(&self, _context: &McpContext) -> Result<Vec<ToolDefinition>> {
+    async fn list_tools(&self, _context: &McpContext) -> McpResult<Vec<ToolDefinition>> {
         Ok(vec![ToolDefinition {
             name: "add_notification".to_string(),
             description: "Add a test notification".to_string(),
@@ -30,21 +30,6 @@ impl McpHandler for NotificationTestHandler {
                 },
                 "required": ["level", "message"]
             }),
-            output_schema: json!({
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "type": {"type": "string"},
-                                "text": {"type": "string"}
-                            }
-                        }
-                    }
-                }
-            }),
         }])
     }
 
@@ -53,12 +38,12 @@ impl McpHandler for NotificationTestHandler {
         name: &str,
         arguments: Value,
         _context: &McpContext,
-    ) -> Result<Value> {
+    ) -> McpResult<Value> {
         match name {
             "add_notification" => {
                 let level = arguments["level"].as_str().unwrap_or("info");
                 if !matches!(level, "info" | "warning" | "error") {
-                    return Err(anyhow::anyhow!("Invalid log level: {}", level));
+                    return Err(McpError::InvalidParams(format!("Invalid log level: {}", level)));
                 }
 
                 let message = arguments["message"].as_str().unwrap_or("").to_string();
@@ -73,13 +58,13 @@ impl McpHandler for NotificationTestHandler {
                     }]
                 }))
             }
-            _ => Err(anyhow::anyhow!("Unknown tool: {}", name)),
+            _ => Err(McpError::InvalidParams(format!("Unknown tool: {}", name))),
         }
     }
 }
 
 #[tokio::test]
-async fn test_notification_tool_execution() -> Result<()> {
+async fn test_notification_tool_execution() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create server with notification handler
     let handler = Arc::new(NotificationTestHandler);
     let mut server = McpServer::with_handler(handler).await?;
@@ -165,7 +150,7 @@ async fn test_notification_tool_execution() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_notification_tool_validation() -> Result<()> {
+async fn test_notification_tool_validation() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create server with notification handler
     let handler = Arc::new(NotificationTestHandler);
     let mut server = McpServer::with_handler(handler).await?;

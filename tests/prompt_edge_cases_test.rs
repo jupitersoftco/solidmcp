@@ -7,11 +7,10 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use std::sync::Arc;
 use async_trait::async_trait;
-use solidmcp::framework::{McpServerBuilder, PromptProvider};
-use solidmcp::handler::{PromptInfo, PromptContent, PromptMessage, PromptArgument};
+use solidmcp::{McpServerBuilder, PromptProvider, PromptInfo, PromptContent, PromptMessage, PromptArgument};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;
@@ -27,7 +26,7 @@ pub struct EdgeCasePromptProvider;
 
 #[async_trait]
 impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
-    async fn list_prompts(&self, _context: Arc<EdgeCaseTestContext>) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, _context: Arc<EdgeCaseTestContext>) -> McpResult<Vec<PromptInfo>> {
         Ok(vec![
             PromptInfo {
                 name: "large_prompt".to_string(),
@@ -76,7 +75,7 @@ impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
         ])
     }
 
-    async fn get_prompt(&self, name: &str, arguments: Option<Value>, _context: Arc<EdgeCaseTestContext>) -> Result<PromptContent> {
+    async fn get_prompt(&self, name: &str, arguments: Option<Value>, _context: Arc<EdgeCaseTestContext>) -> McpResult<PromptContent> {
         let default_map = serde_json::Map::new();
         let args = arguments.as_ref().and_then(|v| v.as_object()).unwrap_or(&default_map);
 
@@ -106,7 +105,7 @@ impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
             "unicode_prompt" => {
                 let text = args.get("text")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: text"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: text"))?;
 
                 // Add various Unicode characters
                 let unicode_content = format!(
@@ -161,7 +160,7 @@ impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
             "json_escape_prompt" => {
                 let special_chars = args.get("special_chars")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: special_chars"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: special_chars"))?;
 
                 // Test various JSON escape characters
                 let escape_content = format!(
@@ -189,7 +188,7 @@ impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
                     ],
                 })
             }
-            _ => Err(anyhow::anyhow!("Prompt not found: {}", name))
+            _ => Err(McpError::InvalidParams(format!("Prompt not found: {}", name)))
         }
     }
 }

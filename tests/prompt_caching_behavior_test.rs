@@ -7,11 +7,10 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use std::sync::Arc;
 use async_trait::async_trait;
-use solidmcp::framework::{McpServerBuilder, PromptProvider};
-use solidmcp::handler::{PromptInfo, PromptContent, PromptMessage, PromptArgument};
+use solidmcp::{McpServerBuilder, PromptProvider, PromptInfo, PromptContent, PromptMessage, PromptArgument};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;
@@ -29,7 +28,7 @@ pub struct CachingPromptProvider;
 
 #[async_trait]
 impl PromptProvider<CachingTestContext> for CachingPromptProvider {
-    async fn list_prompts(&self, context: Arc<CachingTestContext>) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, context: Arc<CachingTestContext>) -> McpResult<Vec<PromptInfo>> {
         // Increment call counter
         context.call_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         
@@ -70,7 +69,7 @@ impl PromptProvider<CachingTestContext> for CachingPromptProvider {
         ])
     }
 
-    async fn get_prompt(&self, name: &str, arguments: Option<Value>, context: Arc<CachingTestContext>) -> Result<PromptContent> {
+    async fn get_prompt(&self, name: &str, arguments: Option<Value>, context: Arc<CachingTestContext>) -> McpResult<PromptContent> {
         // Increment call counter
         context.call_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         
@@ -81,7 +80,7 @@ impl PromptProvider<CachingTestContext> for CachingPromptProvider {
             "static_prompt" => {
                 let input = args.get("input")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing required argument: input"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: input"))?;
 
                 // This should be cacheable - same input always produces same output
                 Ok(PromptContent {
@@ -157,7 +156,7 @@ impl PromptProvider<CachingTestContext> for CachingPromptProvider {
                     ],
                 })
             }
-            _ => Err(anyhow::anyhow!("Prompt not found: {}", name))
+            _ => Err(McpError::InvalidParams(format!("Prompt not found: {}", name)))
         }
     }
 }

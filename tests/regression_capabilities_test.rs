@@ -4,15 +4,15 @@
 
 mod mcp_test_helpers;
 
-use anyhow::Result;
+use solidmcp::{McpResult, McpError};
 use serde_json::{json, Value};
 
 /// Test that capabilities are correctly reported for servers with tools
 #[tokio::test]
-async fn test_capabilities_with_tools() -> Result<()> {
+async fn test_capabilities_with_tools() -> McpResult<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     let client = reqwest::Client::new();
@@ -49,7 +49,7 @@ async fn test_capabilities_with_tools() -> Result<()> {
 
 /// Test that empty servers report no capabilities
 #[tokio::test]
-async fn test_empty_capabilities() -> Result<()> {
+async fn test_empty_capabilities() -> McpResult<()> {
     // This would require creating a server with no tools
     // For now, we'll skip this test
     println!("⏭️  Empty capabilities test skipped (requires empty server)");
@@ -58,10 +58,10 @@ async fn test_empty_capabilities() -> Result<()> {
 
 /// Test that capabilities match actual server features
 #[tokio::test]
-async fn test_capabilities_match_features() -> Result<()> {
+async fn test_capabilities_match_features() -> McpResult<()> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
     let url = server.http_url();
 
     let client = reqwest::Client::new();

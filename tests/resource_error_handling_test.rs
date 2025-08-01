@@ -4,16 +4,13 @@
 //! access denied, timeouts, and protocol error compliance.
 
 use {
-    anyhow::Result,
+    solidmcp::{McpResult, McpError},
     async_trait::async_trait,
     futures_util::{SinkExt, StreamExt},
     serde_json::{json, Value},
     std::{sync::Arc, time::Duration},
     tokio_tungstenite::{connect_async, tungstenite::Message},
-    solidmcp::{
-        framework::{McpServerBuilder, ResourceProvider},
-        handler::{ResourceContent, ResourceInfo},
-    },
+    solidmcp::{McpServerBuilder, ResourceProvider, ResourceContent, ResourceInfo},
 };
 
 mod mcp_test_helpers;
@@ -25,7 +22,7 @@ struct ErrorTestResourceProvider;
 
 #[async_trait]
 impl ResourceProvider<()> for ErrorTestResourceProvider {
-    async fn list_resources(&self, _context: Arc<()>) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, _context: Arc<()>) -> McpResult<Vec<ResourceInfo>> {
         Ok(vec![
             ResourceInfo {
                 uri: "error://not-found".to_string(),
@@ -60,34 +57,34 @@ impl ResourceProvider<()> for ErrorTestResourceProvider {
         ])
     }
 
-    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> Result<ResourceContent> {
+    async fn read_resource(&self, uri: &str, _context: Arc<()>) -> McpResult<ResourceContent> {
         match uri {
             "error://not-found" => {
-                Err(anyhow::anyhow!("Resource not found: {}", uri))
+                Err(McpError::InvalidParams(format!("Resource not found: {}", uri)))
             }
             "error://access-denied" => {
-                Err(anyhow::anyhow!("Access denied to resource: {}", uri))
+                Err(McpError::InvalidParams(format!("Access denied to resource: {}", uri)))
             }
             "error://timeout" => {
                 // Simulate a delay that might cause timeout in real scenarios
                 tokio::time::sleep(Duration::from_millis(100)).await;
-                Err(anyhow::anyhow!("Operation timed out for resource: {}", uri))
+                Err(McpError::InvalidParams(format!("Operation timed out for resource: {}", uri)))
             }
             "error://server-error" => {
-                Err(anyhow::anyhow!("Internal server error while reading resource: {}", uri))
+                Err(McpError::InvalidParams(format!("Internal server error while reading resource: {}", uri)))
             }
             "valid://resource" => Ok(ResourceContent {
                 uri: uri.to_string(),
                 mime_type: Some("text/plain".to_string()),
                 content: "This is a valid resource for testing.".to_string(),
             }),
-            _ => Err(anyhow::anyhow!("Unknown resource: {}", uri)),
+            _ => Err(McpError::InvalidParams(format!("Unknown resource: {}", uri))),
         }
     }
 }
 
 /// Create test server with error provider
-async fn create_error_test_server() -> Result<solidmcp::McpServer> {
+async fn create_error_test_server() -> McpResult<solidmcp::McpServer> {
     McpServerBuilder::new((), "error-test-server", "1.0.0")
         .with_resource_provider(Box::new(ErrorTestResourceProvider))
         .build()
@@ -96,7 +93,7 @@ async fn create_error_test_server() -> Result<solidmcp::McpServer> {
 
 /// Test resource not found error
 #[tokio::test]
-async fn test_resource_not_found_error() -> Result<()> {
+async fn test_resource_not_found_error() -> McpResult<()> {
     init_test_tracing();
 
     with_error_test_server("not_found_test", |server| async move {
@@ -120,7 +117,7 @@ async fn test_resource_not_found_error() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Request non-existent resource
         let read_request = json!({
@@ -134,7 +131,7 @@ async fn test_resource_not_found_error() -> Result<()> {
 
         write.send(Message::Text(read_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Should return JSON-RPC error
@@ -152,7 +149,7 @@ async fn test_resource_not_found_error() -> Result<()> {
 
 /// Test access denied error
 #[tokio::test]
-async fn test_access_denied_error() -> Result<()> {
+async fn test_access_denied_error() -> McpResult<()> {
     init_test_tracing();
 
     with_error_test_server("access_denied_test", |server| async move {
@@ -176,7 +173,7 @@ async fn test_access_denied_error() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Request access denied resource
         let read_request = json!({
@@ -190,7 +187,7 @@ async fn test_access_denied_error() -> Result<()> {
 
         write.send(Message::Text(read_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Should return JSON-RPC error
@@ -206,7 +203,7 @@ async fn test_access_denied_error() -> Result<()> {
 
 /// Test server error handling
 #[tokio::test]
-async fn test_server_error_handling() -> Result<()> {
+async fn test_server_error_handling() -> McpResult<()> {
     init_test_tracing();
 
     with_error_test_server("server_error_test", |server| async move {
@@ -230,7 +227,7 @@ async fn test_server_error_handling() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Request resource that causes server error
         let error_request = json!({
@@ -244,7 +241,7 @@ async fn test_server_error_handling() -> Result<()> {
 
         write.send(Message::Text(error_request.to_string().into())).await?;
         let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
         let parsed: Value = serde_json::from_str(&response)?;
 
         // Should return internal error
@@ -260,7 +257,7 @@ async fn test_server_error_handling() -> Result<()> {
 
 /// Test HTTP error responses
 #[tokio::test]
-async fn test_http_error_responses() -> Result<()> {
+async fn test_http_error_responses() -> McpResult<()> {
     init_test_tracing();
 
     with_error_test_server("http_error_test", |server| async move {
@@ -329,7 +326,7 @@ async fn test_http_error_responses() -> Result<()> {
 
 /// Test error message format compliance
 #[tokio::test]
-async fn test_error_format_compliance() -> Result<()> {
+async fn test_error_format_compliance() -> McpResult<()> {
     init_test_tracing();
 
     with_error_test_server("error_format_test", |server| async move {
@@ -353,7 +350,7 @@ async fn test_error_format_compliance() -> Result<()> {
 
         write.send(Message::Text(init_request.to_string().into())).await?;
         receive_ws_message(&mut read, Duration::from_secs(5)).await
-            .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+            .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
 
         // Test multiple error scenarios
         // Note: The framework converts all resource errors to "Resource not found"
@@ -375,7 +372,7 @@ async fn test_error_format_compliance() -> Result<()> {
 
             write.send(Message::Text(read_request.to_string().into())).await?;
             let response = receive_ws_message(&mut read, Duration::from_secs(5)).await
-                .map_err(|e| anyhow::anyhow!("WebSocket error: {}", e))?;
+                .map_err(|e| McpError::InvalidParams(format!("WebSocket error: {}", e)))?;
             let parsed: Value = serde_json::from_str(&response)?;
 
             // Verify JSON-RPC error format
@@ -395,9 +392,9 @@ async fn test_error_format_compliance() -> Result<()> {
 }
 
 // Helper function to create error test server
-async fn start_error_test_server() -> Result<u16> {
+async fn start_error_test_server() -> McpResult<u16> {
     let port = find_available_port().await
-        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
+        .map_err(|e| McpError::InvalidParams(format!("Failed to find port: {}", e)))?;
     let mut server = create_error_test_server().await?;
     
     tokio::spawn(async move {
@@ -414,10 +411,10 @@ async fn start_error_test_server() -> Result<u16> {
 async fn with_error_test_server<F, Fut, T>(
     test_name: &str,
     test_fn: F,
-) -> Result<T>
+) -> McpResult<T>
 where
     F: FnOnce(McpTestServer) -> Fut,
-    Fut: std::future::Future<Output = Result<T>>,
+    Fut: std::future::Future<Output = anyhow::Result<T>>,
 {
     tracing::info!("🚀 Starting MCP error test server for: {}", test_name);
 
