@@ -91,7 +91,7 @@ async fn create_test_prompt_server() -> McpResult<u16> {
                 "simple_template" => {
                     let name = args.get("name")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: name"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: name".to_string()))?;
                     
                     Ok(PromptContent {
                         messages: vec![
@@ -105,7 +105,7 @@ async fn create_test_prompt_server() -> McpResult<u16> {
                 "complex_template" => {
                     let title = args.get("title")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: title"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: title".to_string()))?;
                     
                     let author = args.get("author")
                         .and_then(|v| v.as_str())
@@ -134,7 +134,7 @@ async fn create_test_prompt_server() -> McpResult<u16> {
                 "numeric_template" => {
                     let count = args.get("count")
                         .and_then(|v| v.as_i64())
-                        .ok_or_else(|| McpError::InvalidParams("Missing or invalid parameter: count"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing or invalid parameter: count".to_string()))?;
                     
                     let percentage = args.get("percentage")
                         .and_then(|v| v.as_f64())
@@ -175,7 +175,7 @@ async fn create_test_prompt_server() -> McpResult<u16> {
 }
 
 #[tokio::test]
-async fn test_prompt_list_with_arguments() -> McpResult<()> {
+async fn test_prompt_list_with_arguments() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 
@@ -239,7 +239,7 @@ async fn test_prompt_list_with_arguments() -> McpResult<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_simple_parameter_substitution() -> McpResult<()> {
+async fn test_prompt_simple_parameter_substitution() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 
@@ -298,7 +298,7 @@ async fn test_prompt_simple_parameter_substitution() -> McpResult<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_missing_required_parameter() -> McpResult<()> {
+async fn test_prompt_missing_required_parameter() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 
@@ -346,7 +346,7 @@ async fn test_prompt_missing_required_parameter() -> McpResult<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_numeric_parameters() -> McpResult<()> {
+async fn test_prompt_numeric_parameters() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_test_prompt_server().await?;
 

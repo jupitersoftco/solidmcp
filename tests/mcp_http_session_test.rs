@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 
 /// Test that HTTP clients without cookie support can use the default session
 #[tokio::test]
-async fn test_http_default_session_fallback() -> McpResult<()> {
+async fn test_http_default_session_fallback() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     // Start test server
@@ -67,7 +67,7 @@ async fn test_http_default_session_fallback() -> McpResult<()> {
 
 /// Test that multiple stateless clients can work concurrently
 #[tokio::test]
-async fn test_http_concurrent_stateless_clients() -> McpResult<()> {
+async fn test_http_concurrent_stateless_clients() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
@@ -128,7 +128,7 @@ async fn test_http_concurrent_stateless_clients() -> McpResult<()> {
 
 /// Test that session cookies are still respected when provided
 #[tokio::test]
-async fn test_http_session_cookie_still_works() -> McpResult<()> {
+async fn test_http_session_cookie_still_works() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
@@ -185,7 +185,7 @@ async fn test_http_session_cookie_still_works() -> McpResult<()> {
 
 /// Test error cases when no session exists
 #[tokio::test]
-async fn test_http_notifications_without_session() -> McpResult<()> {
+async fn test_http_notifications_without_session() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
@@ -214,7 +214,7 @@ async fn test_http_notifications_without_session() -> McpResult<()> {
 
 /// Test that initialize method always uses consistent session
 #[tokio::test]
-async fn test_http_initialize_consistent_session() -> McpResult<()> {
+async fn test_http_initialize_consistent_session() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()
@@ -269,7 +269,7 @@ async fn test_http_initialize_consistent_session() -> McpResult<()> {
 
 /// Test tool execution with stateless client
 #[tokio::test]
-async fn test_http_tool_execution_stateless() -> McpResult<()> {
+async fn test_http_tool_execution_stateless() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     let server = mcp_test_helpers::McpTestServer::start()

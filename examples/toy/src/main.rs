@@ -7,7 +7,7 @@ use {
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
     serde_json::Value,
-    solidmcp::McpServerBuilder,
+    solidmcp::{McpServerBuilder, McpError},
     std::{env, sync::Arc},
     toy_notes_server::{NotesContext, NotesPromptProvider, NotesResourceProvider},
     tracing::info,
@@ -134,7 +134,7 @@ async fn main() -> Result<()> {
                             content,
                         })
                     } else {
-                        Err(anyhow::anyhow!("Note not found: {}", input.name))
+                        Err(McpError::InvalidParams(format!("Note not found: {}", input.name)))
                     }
                 },
             )
@@ -143,10 +143,11 @@ async fn main() -> Result<()> {
                 "Delete a note from the notes directory",
                 |input: DeleteNote, ctx: Arc<NotesContext>, notify| async move {
                     if ctx.get_note(&input.name).await.is_none() {
-                        return Err(anyhow::anyhow!("Note not found: {}", input.name));
+                        return Err(McpError::InvalidParams(format!("Note not found: {}", input.name)));
                     }
 
-                    ctx.delete_note(&input.name).await?;
+                    ctx.delete_note(&input.name).await
+                        .map_err(|e| McpError::Internal(e.to_string()))?;
 
                     // Clean notification API - no boilerplate!
                     notify.info(&format!("Note '{}' deleted", input.name))?;
@@ -167,7 +168,7 @@ async fn main() -> Result<()> {
                         "info" => notify.info(&input.message)?,
                         "warning" => notify.warn(&input.message)?,
                         "error" => notify.error(&input.message)?,
-                        _ => return Err(anyhow::anyhow!("Invalid log level: {}", input.level)),
+                        _ => return Err(McpError::InvalidParams(format!("Invalid log level: {}", input.level))),
                     }
 
                     Ok(NotificationResult {

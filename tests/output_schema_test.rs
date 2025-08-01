@@ -50,7 +50,7 @@ async fn test_tool_with_output_schema() -> Result<(), Box<dyn std::error::Error 
                     "multiply" => input.a * input.b,
                     "divide" => {
                         if input.b == 0.0 {
-                            return Err(McpError::InvalidParams("Division by zero"));
+                            return Err(McpError::InvalidParams("Division by zero".to_string()));
                         }
                         input.a / input.b
                     }

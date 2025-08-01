@@ -74,7 +74,7 @@ async fn create_error_test_server() -> McpResult<u16> {
 
             match name {
                 "error_prompt" => {
-                    Err(McpError::InvalidParams("Intentional error for testing"))
+                    Err(McpError::InvalidParams("Intentional error for testing".to_string()))
                 }
                 "large_prompt" => {
                     let size = args.get("size")
@@ -96,7 +96,7 @@ async fn create_error_test_server() -> McpResult<u16> {
                 "special_chars_prompt" => {
                     let text = args.get("text")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: text"))?;
+                        .ok_or_else(|| McpError::InvalidParams("Missing required parameter: text".to_string()))?;
                     
                     Ok(PromptContent {
                         messages: vec![
@@ -130,7 +130,7 @@ async fn create_error_test_server() -> McpResult<u16> {
 }
 
 #[tokio::test]
-async fn test_prompt_provider_error() -> McpResult<()> {
+async fn test_prompt_provider_error() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 
@@ -180,7 +180,7 @@ async fn test_prompt_provider_error() -> McpResult<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_large_content() -> McpResult<()> {
+async fn test_prompt_large_content() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 
@@ -239,7 +239,7 @@ async fn test_prompt_large_content() -> McpResult<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_special_characters() -> McpResult<()> {
+async fn test_prompt_special_characters() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 
@@ -302,7 +302,7 @@ async fn test_prompt_special_characters() -> McpResult<()> {
 }
 
 #[tokio::test]
-async fn test_prompt_concurrent_requests() -> McpResult<()> {
+async fn test_prompt_concurrent_requests() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
     let port = create_error_test_server().await?;
 

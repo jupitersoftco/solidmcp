@@ -80,7 +80,7 @@ impl PromptProvider<CachingTestContext> for CachingPromptProvider {
             "static_prompt" => {
                 let input = args.get("input")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: input"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: input".to_string()))?;
 
                 // This should be cacheable - same input always produces same output
                 Ok(PromptContent {

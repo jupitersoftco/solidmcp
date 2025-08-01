@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 /// Test that server info is correctly reported
 #[tokio::test]
-async fn test_server_info_correctness() -> McpResult<()> {
+async fn test_server_info_correctness() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
@@ -52,7 +52,7 @@ async fn test_server_info_correctness() -> McpResult<()> {
 
 /// Test protocol version negotiation
 #[tokio::test]
-async fn test_protocol_version_negotiation() -> McpResult<()> {
+async fn test_protocol_version_negotiation() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
@@ -87,7 +87,7 @@ async fn test_protocol_version_negotiation() -> McpResult<()> {
 
 /// Test that server handles re-initialization correctly
 #[tokio::test]
-async fn test_reinitialization_handling() -> McpResult<()> {
+async fn test_reinitialization_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;

@@ -20,7 +20,7 @@ async fn find_available_port() -> u16 {
 
 /// Test basic WebSocket connection and initialization
 #[tokio::test]
-async fn test_websocket_connection_and_init() -> McpResult<()> {
+async fn test_websocket_connection_and_init() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Start server on random port
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
@@ -72,7 +72,7 @@ async fn test_websocket_connection_and_init() -> McpResult<()> {
 
 /// Test WebSocket message ordering
 #[tokio::test]
-async fn test_websocket_message_ordering() -> McpResult<()> {
+async fn test_websocket_message_ordering() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -134,7 +134,7 @@ async fn test_websocket_message_ordering() -> McpResult<()> {
 
 /// Test WebSocket ping/pong handling
 #[tokio::test]
-async fn test_websocket_ping_pong() -> McpResult<()> {
+async fn test_websocket_ping_pong() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -167,7 +167,7 @@ async fn test_websocket_ping_pong() -> McpResult<()> {
 
 /// Test WebSocket close handling
 #[tokio::test]
-async fn test_websocket_close_handling() -> McpResult<()> {
+async fn test_websocket_close_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -211,7 +211,7 @@ async fn test_websocket_close_handling() -> McpResult<()> {
 
 /// Test handling of large WebSocket messages
 #[tokio::test]
-async fn test_websocket_large_messages() -> McpResult<()> {
+async fn test_websocket_large_messages() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -263,7 +263,7 @@ async fn test_websocket_large_messages() -> McpResult<()> {
 
 /// Test concurrent WebSocket connections
 #[tokio::test]
-async fn test_concurrent_websocket_connections() -> McpResult<()> {
+async fn test_concurrent_websocket_connections() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 
@@ -339,7 +339,7 @@ async fn test_concurrent_websocket_connections() -> McpResult<()> {
 
 /// Test WebSocket reconnection
 #[tokio::test]
-async fn test_websocket_reconnection() -> McpResult<()> {
+async fn test_websocket_reconnection() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let port = find_available_port().await;
     let mut server = McpServer::new().await?;
 

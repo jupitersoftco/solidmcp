@@ -2,7 +2,7 @@ use {
     anyhow::Result,
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
-    solidmcp::framework::{McpServerBuilder, NotificationCtx},
+    solidmcp::{McpServerBuilder, NotificationCtx},
     std::sync::Arc,
 };
 

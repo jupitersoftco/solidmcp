@@ -10,8 +10,8 @@ use futures_util::{SinkExt, StreamExt};
 use solidmcp::{McpResult, McpError};
 use std::sync::Arc;
 use async_trait::async_trait;
-use solidmcp::McpServerBuilder, PromptProvider;
-use solidmcp::PromptInfo, PromptContent, PromptMessage, PromptArgument;
+use solidmcp::{McpServerBuilder, PromptProvider};
+use solidmcp::{PromptInfo, PromptContent, PromptMessage, PromptArgument};
 
 mod mcp_test_helpers;
 use mcp_test_helpers::*;
@@ -72,7 +72,7 @@ impl PromptProvider<ConcurrentTestContext> for ConcurrentPromptProvider {
             "concurrent_prompt" => {
                 let data = args.get("data")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: data"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: data".to_string()))?;
 
                 // Simulate some processing time
                 tokio::time::sleep(Duration::from_millis(5)).await;

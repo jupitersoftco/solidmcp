@@ -105,7 +105,7 @@ impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
             "unicode_prompt" => {
                 let text = args.get("text")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: text"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: text".to_string()))?;
 
                 // Add various Unicode characters
                 let unicode_content = format!(
@@ -160,7 +160,7 @@ impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
             "json_escape_prompt" => {
                 let special_chars = args.get("special_chars")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: special_chars"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: special_chars".to_string()))?;
 
                 // Test various JSON escape characters
                 let escape_content = format!(

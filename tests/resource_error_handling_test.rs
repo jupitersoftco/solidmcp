@@ -84,7 +84,7 @@ impl ResourceProvider<()> for ErrorTestResourceProvider {
 }
 
 /// Create test server with error provider
-async fn create_error_test_server() -> McpResult<solidmcp::McpServer> {
+async fn create_error_test_server() -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
     McpServerBuilder::new((), "error-test-server", "1.0.0")
         .with_resource_provider(Box::new(ErrorTestResourceProvider))
         .build()
@@ -93,7 +93,7 @@ async fn create_error_test_server() -> McpResult<solidmcp::McpServer> {
 
 /// Test resource not found error
 #[tokio::test]
-async fn test_resource_not_found_error() -> McpResult<()> {
+async fn test_resource_not_found_error() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_error_test_server("not_found_test", |server| async move {
@@ -149,7 +149,7 @@ async fn test_resource_not_found_error() -> McpResult<()> {
 
 /// Test access denied error
 #[tokio::test]
-async fn test_access_denied_error() -> McpResult<()> {
+async fn test_access_denied_error() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_error_test_server("access_denied_test", |server| async move {
@@ -203,7 +203,7 @@ async fn test_access_denied_error() -> McpResult<()> {
 
 /// Test server error handling
 #[tokio::test]
-async fn test_server_error_handling() -> McpResult<()> {
+async fn test_server_error_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_error_test_server("server_error_test", |server| async move {
@@ -257,7 +257,7 @@ async fn test_server_error_handling() -> McpResult<()> {
 
 /// Test HTTP error responses
 #[tokio::test]
-async fn test_http_error_responses() -> McpResult<()> {
+async fn test_http_error_responses() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_error_test_server("http_error_test", |server| async move {
@@ -326,7 +326,7 @@ async fn test_http_error_responses() -> McpResult<()> {
 
 /// Test error message format compliance
 #[tokio::test]
-async fn test_error_format_compliance() -> McpResult<()> {
+async fn test_error_format_compliance() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_error_test_server("error_format_test", |server| async move {
@@ -411,14 +411,15 @@ async fn start_error_test_server() -> McpResult<u16> {
 async fn with_error_test_server<F, Fut, T>(
     test_name: &str,
     test_fn: F,
-) -> McpResult<T>
+) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
 where
     F: FnOnce(McpTestServer) -> Fut,
     Fut: std::future::Future<Output = anyhow::Result<T>>,
 {
     tracing::info!("🚀 Starting MCP error test server for: {}", test_name);
 
-    let port = start_error_test_server().await?;
+    let port = start_error_test_server().await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     let server = McpTestServer {
         port,
         server_handle: tokio::spawn(async {}),
@@ -428,5 +429,5 @@ where
     let result = test_fn(server).await;
     tracing::info!("🛑 Stopping MCP error test server for: {}", test_name);
 
-    result
+    result.map_err(|e| e.into())
 }

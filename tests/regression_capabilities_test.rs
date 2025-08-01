@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 /// Test that capabilities are correctly reported for servers with tools
 #[tokio::test]
-async fn test_capabilities_with_tools() -> McpResult<()> {
+async fn test_capabilities_with_tools() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;
@@ -49,7 +49,7 @@ async fn test_capabilities_with_tools() -> McpResult<()> {
 
 /// Test that empty servers report no capabilities
 #[tokio::test]
-async fn test_empty_capabilities() -> McpResult<()> {
+async fn test_empty_capabilities() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // This would require creating a server with no tools
     // For now, we'll skip this test
     println!("⏭️  Empty capabilities test skipped (requires empty server)");
@@ -58,7 +58,7 @@ async fn test_empty_capabilities() -> McpResult<()> {
 
 /// Test that capabilities match actual server features
 #[tokio::test]
-async fn test_capabilities_match_features() -> McpResult<()> {
+async fn test_capabilities_match_features() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let server = mcp_test_helpers::McpTestServer::start()
         .await
         .map_err(|e| McpError::InvalidParams(format!("{}", e)))?;

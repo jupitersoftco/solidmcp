@@ -418,14 +418,15 @@ async fn start_metadata_test_server() -> McpResult<u16> {
 async fn with_metadata_test_server<F, Fut, T>(
     test_name: &str,
     test_fn: F,
-) -> McpResult<T>
+) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
 where
     F: FnOnce(McpTestServer) -> Fut,
     Fut: std::future::Future<Output = anyhow::Result<T>>,
 {
     tracing::info!("🚀 Starting MCP metadata test server for: {}", test_name);
 
-    let port = start_metadata_test_server().await?;
+    let port = start_metadata_test_server().await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     let server = McpTestServer {
         port,
         server_handle: tokio::spawn(async {}),
@@ -435,5 +436,5 @@ where
     let result = test_fn(server).await;
     tracing::info!("🛑 Stopping MCP metadata test server for: {}", test_name);
 
-    result
+    result.map_err(|e| e.into())
 }

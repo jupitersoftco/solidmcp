@@ -58,7 +58,7 @@ impl PromptProvider<TestContext> for TestPromptProvider {
                 let args = arguments.as_ref().and_then(|v| v.as_object()).unwrap_or(&default_map);
                 let name = args.get("name")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: name"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: name".to_string()))?;
 
                 Ok(PromptContent {
                     messages: vec![
@@ -74,7 +74,7 @@ impl PromptProvider<TestContext> for TestPromptProvider {
                 let args = arguments.as_ref().and_then(|v| v.as_object()).unwrap_or(&default_map);
                 let code = args.get("code")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: code"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: code".to_string()))?;
                 let language = args.get("language")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown");

@@ -58,7 +58,7 @@ impl McpHandler for TestMcpHandler {
 }
 
 #[tokio::test]
-async fn test_custom_trait_implementation() -> McpResult<()> {
+async fn test_custom_trait_implementation() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     // Create server with custom handler
@@ -128,7 +128,7 @@ async fn test_custom_trait_implementation() -> McpResult<()> {
 }
 
 #[tokio::test]
-async fn test_trait_error_handling() -> McpResult<()> {
+async fn test_trait_error_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     // Create server with custom handler

@@ -7,6 +7,7 @@ use {
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
     serde_json::{json, Value},
+    solidmcp::McpError,
     std::{fs, path::PathBuf, sync::Arc, time::Duration},
     tempfile::TempDir,
     tokio::time::timeout,
@@ -93,7 +94,7 @@ async fn create_test_server(notes_dir: PathBuf) -> Result<solidmcp::McpServer> {
                     "info" => notify.info(&input.message)?,
                     "warning" => notify.warn(&input.message)?,
                     "error" => notify.error(&input.message)?,
-                    _ => return Err(anyhow::anyhow!("Invalid log level: {}", input.level)),
+                    _ => return Err(McpError::InvalidParams(format!("Invalid log level: {}", input.level))),
                 }
 
                 Ok(NotificationResult { success: true })

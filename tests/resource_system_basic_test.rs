@@ -90,7 +90,7 @@ async fn create_resource_test_server(context: ()) -> Result<solidmcp::McpServer,
 
 /// Test basic resources/list functionality via WebSocket
 #[tokio::test]
-async fn test_websocket_resources_list() -> anyhow::Result<()> {
+async fn test_websocket_resources_list() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_test_server("resource_list_ws", |server| async move {
@@ -148,7 +148,7 @@ async fn test_websocket_resources_list() -> anyhow::Result<()> {
 
 /// Test basic resources/read functionality via WebSocket
 #[tokio::test]
-async fn test_websocket_resources_read() -> anyhow::Result<()> {
+async fn test_websocket_resources_read() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_test_server("resource_read_ws", |server| async move {
@@ -205,7 +205,7 @@ async fn test_websocket_resources_read() -> anyhow::Result<()> {
 
 /// Test resources functionality via HTTP
 #[tokio::test]
-async fn test_http_resources_list() -> anyhow::Result<()> {
+async fn test_http_resources_list() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_test_server("resource_list_http", |server| async move {
@@ -274,7 +274,7 @@ async fn test_http_resources_list() -> anyhow::Result<()> {
 
 /// Test resource not found error handling
 #[tokio::test]
-async fn test_resource_not_found() -> anyhow::Result<()> {
+async fn test_resource_not_found() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_test_server("resource_not_found", |server| async move {
@@ -356,5 +356,5 @@ where
     let result = test_fn(server).await;
     tracing::info!("🛑 Stopping MCP resource test server for: {}", test_name);
 
-    result
+    result.map_err(|e| e.into())
 }

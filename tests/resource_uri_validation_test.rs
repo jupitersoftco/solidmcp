@@ -137,7 +137,7 @@ async fn create_uri_test_server() -> McpResult<solidmcp::McpServer> {
 
 /// Test file:// scheme URI handling
 #[tokio::test]
-async fn test_file_scheme_uri() -> McpResult<()> {
+async fn test_file_scheme_uri() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_uri_test_server("file_scheme_test", |server| async move {
@@ -186,7 +186,7 @@ async fn test_file_scheme_uri() -> McpResult<()> {
 
 /// Test HTTP/HTTPS scheme URI handling
 #[tokio::test]
-async fn test_http_schemes_uri() -> McpResult<()> {
+async fn test_http_schemes_uri() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_uri_test_server("http_schemes_test", |server| async move {
@@ -256,7 +256,7 @@ async fn test_http_schemes_uri() -> McpResult<()> {
 
 /// Test custom scheme URI handling
 #[tokio::test]
-async fn test_custom_schemes_uri() -> McpResult<()> {
+async fn test_custom_schemes_uri() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_uri_test_server("custom_schemes_test", |server| async move {
@@ -307,7 +307,7 @@ async fn test_custom_schemes_uri() -> McpResult<()> {
 
 /// Test complex URI with all components
 #[tokio::test]
-async fn test_complex_uri_components() -> McpResult<()> {
+async fn test_complex_uri_components() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_uri_test_server("complex_uri_test", |server| async move {
@@ -359,7 +359,7 @@ async fn test_complex_uri_components() -> McpResult<()> {
 
 /// Test URI with special characters and encoding
 #[tokio::test]
-async fn test_uri_special_characters() -> McpResult<()> {
+async fn test_uri_special_characters() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_uri_test_server("special_chars_test", |server| async move {
@@ -410,7 +410,7 @@ async fn test_uri_special_characters() -> McpResult<()> {
 
 /// Test unsupported URI scheme error handling
 #[tokio::test]
-async fn test_unsupported_uri_scheme() -> McpResult<()> {
+async fn test_unsupported_uri_scheme() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
     with_mcp_uri_test_server("unsupported_scheme_test", |server| async move {

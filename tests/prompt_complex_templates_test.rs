@@ -92,7 +92,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
             "multi_role_prompt" => {
                 let topic = args.get("topic")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: topic"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: topic".to_string()))?;
                 let expertise_level = args.get("expertise_level")
                     .and_then(|v| v.as_str())
                     .unwrap_or("intermediate");
@@ -127,7 +127,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
             "conditional_prompt" => {
                 let task_type = args.get("task_type")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: task_type"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: task_type".to_string()))?;
                 let context = args.get("context")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
@@ -170,10 +170,10 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
             "nested_params_prompt" => {
                 let user_name = args.get("user_name")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: user_name"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: user_name".to_string()))?;
                 let project_name = args.get("project_name")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: project_name"))?;
+                    .ok_or_else(|| McpError::InvalidParams("Missing required argument: project_name".to_string()))?;
                 let deadline = args.get("deadline")
                     .and_then(|v| v.as_str());
 

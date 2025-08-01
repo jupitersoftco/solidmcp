@@ -9,6 +9,7 @@ use {
     solidmcp::{
         PromptProvider, ResourceProvider,
         PromptArgument, PromptContent, PromptInfo, PromptMessage, ResourceContent, ResourceInfo,
+        McpResult, McpError,
     },
     std::{collections::HashMap, fs, path::PathBuf, sync::Arc},
     tokio::sync::RwLock,
@@ -81,7 +82,7 @@ pub struct NotesResourceProvider;
 
 #[async_trait]
 impl ResourceProvider<NotesContext> for NotesResourceProvider {
-    async fn list_resources(&self, context: Arc<NotesContext>) -> Result<Vec<ResourceInfo>> {
+    async fn list_resources(&self, context: Arc<NotesContext>) -> McpResult<Vec<ResourceInfo>> {
         let notes = context.list_notes().await;
         let mut resources = Vec::new();
 
@@ -101,7 +102,7 @@ impl ResourceProvider<NotesContext> for NotesResourceProvider {
         &self,
         uri: &str,
         context: Arc<NotesContext>,
-    ) -> Result<ResourceContent> {
+    ) -> McpResult<ResourceContent> {
         if let Some(note_name) = uri.strip_prefix("note://") {
             if let Some(content) = context.get_note(note_name).await {
                 return Ok(ResourceContent {
@@ -111,7 +112,7 @@ impl ResourceProvider<NotesContext> for NotesResourceProvider {
                 });
             }
         }
-        Err(anyhow::anyhow!("Resource not found: {}", uri))
+        Err(McpError::UnknownResource(uri.to_string()))
     }
 }
 
@@ -120,7 +121,7 @@ pub struct NotesPromptProvider;
 
 #[async_trait]
 impl PromptProvider<NotesContext> for NotesPromptProvider {
-    async fn list_prompts(&self, _context: Arc<NotesContext>) -> Result<Vec<PromptInfo>> {
+    async fn list_prompts(&self, _context: Arc<NotesContext>) -> McpResult<Vec<PromptInfo>> {
         Ok(vec![
             PromptInfo {
                 name: "meeting_notes".to_string(),
@@ -176,7 +177,7 @@ impl PromptProvider<NotesContext> for NotesPromptProvider {
         name: &str,
         arguments: Option<Value>,
         _context: Arc<NotesContext>,
-    ) -> Result<PromptContent> {
+    ) -> McpResult<PromptContent> {
         let args = arguments.unwrap_or_default();
 
         match name {
@@ -223,7 +224,7 @@ impl PromptProvider<NotesContext> for NotesPromptProvider {
                     }],
                 })
             }
-            _ => Err(anyhow::anyhow!("Prompt not found: {}", name)),
+            _ => Err(McpError::InvalidParams(format!("Prompt not found: {}", name))),
         }
     }
 }
