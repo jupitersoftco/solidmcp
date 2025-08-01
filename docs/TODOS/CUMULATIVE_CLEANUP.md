@@ -30,10 +30,17 @@ Each TODO follows this pattern:
    - Reduced public exports from 29 to 13
    - Made all internal modules private
    - Created clean, minimal public API
-6. [TODO-023: Remove Circular Dependencies](./TODO-023.md) - Depends on: TODO-022
+6. ✅ **[TODO-023: Remove Circular Dependencies](./TODO-023.md)** - **COMPLETED** (2025-08-01)
+   - Removed duplicate handlers.rs file
+   - Moved tools.rs to examples
+   - Eliminated all circular dependencies
+   - Removed legacy backward compatibility exports
 
 ### 🟢 TESTING FOUNDATION (Week 3)
-7. [TODO-024: Add Framework Layer Unit Tests](./TODO-024.md) - Depends on: TODO-023
+7. ✅ **[TODO-024: Add Framework Layer Unit Tests](./TODO-024.md)** - **COMPLETED** (2025-08-01)
+   - Added comprehensive builder pattern tests
+   - Covered tool registration, context sharing, error handling
+   - Tests serve as living documentation for framework API
 8. [TODO-025: Add Integration Tests for Protocol Flows](./TODO-025.md) - Depends on: TODO-024
 
 ### 🔵 PERFORMANCE OPTIMIZATIONS (Week 4)
@@ -57,7 +64,7 @@ These are moved to `future/` directory as they're not essential for library func
 | **Error Handling** | ✅ Complete | TODO-019 (Done) |
 | **Security** | 🔴 Critical | TODO-015 |
 | **Scalability** | 🟡 Improved | TODO-018 (Done) |
-| **Testing** | 🔴 Critical | TODO-024 |
+| **Testing** | 🟡 Improved | TODO-025 |
 | **Performance** | 🟡 Poor | TODO-027 |
 | **Observability** | ✅ Complete | TODO-020 (Done) |
 | **Operations** | 🔴 None | TODO-036 |
