@@ -193,7 +193,14 @@ impl McpTools {
 
     /// Read file handler for MCP with error logging
     async fn handle_read_file(params: Value) -> Result<Value> {
-        let file_path = params["file_path"].as_str().unwrap_or("");
+        let file_path = params["file_path"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter 'file_path'"))?;
+        
+        if file_path.is_empty() {
+            return Err(anyhow::anyhow!("Parameter 'file_path' cannot be empty"));
+        }
+        
         debug!("📖 Reading file: {}", file_path);
 
         match fs::read_to_string(file_path).await {

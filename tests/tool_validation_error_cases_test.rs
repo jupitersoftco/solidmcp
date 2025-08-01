@@ -101,8 +101,8 @@ async fn test_invalid_tool_argument_types() {
             );
             
             let error = response.get("error").unwrap();
-            // Should be internal error (-32603) since these errors happen during tool execution
-            assert_eq!(error["code"], -32603, "Wrong error code for: {}", description);
+            // Should be invalid params error (-32602) for validation errors
+            assert_eq!(error["code"], -32602, "Wrong error code for: {}", description);
         }
 
         Ok(())
@@ -182,27 +182,17 @@ async fn test_missing_required_arguments() {
             let response_text = receive_ws_message(&mut read, Duration::from_secs(5)).await?;
             let response: serde_json::Value = serde_json::from_str(&response_text)?;
             
-            // Debug output to see what we're actually getting
-            println!("Response for {}: {}", description, serde_json::to_string_pretty(&response)?);
+            // Should return error
+            assert!(
+                response.get("error").is_some(),
+                "Expected error for: {}, but got: {}",
+                description,
+                serde_json::to_string_pretty(&response)?
+            );
             
-            // Check if we got an error or a result
-            if response.get("error").is_some() {
-                // Good - we got an error as expected
-                println!("✓ Got expected error for: {}", description);
-            } else if let Some(result) = response.get("result") {
-                // Bad - tool succeeded when it should have failed
-                // For read_file with missing params, it might return success with error in data
-                if let Some(data) = result.get("data") {
-                    if let Some(error) = data.get("error") {
-                        println!("! Tool returned success with error in data: {}", error);
-                        // This is the current behavior - not ideal but let's document it
-                        continue;
-                    }
-                }
-                panic!("Expected error for: {}, but got success: {}", description, serde_json::to_string(&result)?);
-            } else {
-                panic!("Unexpected response format for: {}", description);
-            }
+            let error = response.get("error").unwrap();
+            // Should be invalid params error (-32602) for missing params
+            assert_eq!(error["code"], -32602, "Wrong error code for: {}", description);
         }
 
         Ok(())

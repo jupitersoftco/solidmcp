@@ -288,7 +288,20 @@ impl McpProtocolHandlerImpl {
         let tool_name = params["name"].as_str().ok_or_else(|| {
             McpError::InvalidParams("Missing required 'name' field for tool call".to_string())
         })?;
-        let arguments = params["arguments"].clone();
+        
+        // Validate arguments is present and is an object
+        let arguments = params.get("arguments").ok_or_else(|| {
+            McpError::InvalidParams("Missing required 'arguments' field for tool call".to_string())
+        })?;
+        
+        // Arguments must be an object
+        if !arguments.is_object() {
+            return Err(McpError::InvalidParams(
+                "Arguments must be an object".to_string()
+            ).into());
+        }
+        
+        let arguments = arguments.clone();
 
         debug!(
             "🛠️  Processing tool call: {} with args: {:?}",
@@ -301,8 +314,14 @@ impl McpProtocolHandlerImpl {
                 Ok(result)
             }
             Err(e) => {
-                if e.to_string().contains("Unknown tool") {
+                let error_msg = e.to_string();
+                if error_msg.contains("Unknown tool") {
                     Err(McpError::UnknownTool(tool_name.to_string()).into())
+                } else if error_msg.contains("Missing required parameter") 
+                    || error_msg.contains("cannot be empty") 
+                    || error_msg.contains("Wrong type for") {
+                    // Convert parameter validation errors to InvalidParams
+                    Err(McpError::InvalidParams(error_msg).into())
                 } else {
                     Err(e)
                 }

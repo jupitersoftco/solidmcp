@@ -155,17 +155,9 @@ async fn test_websocket_upgrade_with_transport_discovery() {
         
         assert!(websocket_transport["uri"].as_str().unwrap().starts_with("ws://"));
 
-        // Now test the actual upgrade using the discovered URI
-        let ws_url = websocket_transport["uri"].as_str().unwrap();
-        println!("WebSocket URL from transport discovery: {}", ws_url);
-        
-        // The discovered URL might have a hostname that can't be resolved
-        // Replace with the actual server address
-        let ws_url = if ws_url.contains("unknown") || ws_url.contains("localhost") {
-            format!("ws://127.0.0.1:{}/mcp", server.port)
-        } else {
-            ws_url.to_string()
-        };
+        // The transport discovery returns a generic URI since it doesn't know the actual host
+        // For testing, we'll construct the URL using the known server port
+        let ws_url = format!("ws://127.0.0.1:{}/mcp", server.port);
         
         let (ws_stream, _) = tokio_tungstenite::connect_async(&ws_url).await?;
         let (mut write, mut read) = ws_stream.split();
@@ -435,7 +427,8 @@ async fn test_websocket_upgrade_error_conditions() {
         assert_ne!(response.status(), 101);
 
         // Test malformed WebSocket key
-        // Note: The server currently doesn't validate the key format
+        // Note: Warp's WebSocket implementation doesn't validate key format
+        // This is a limitation of the underlying library
         let response = client
             .get(&url)
             .header("Upgrade", "websocket")
@@ -445,7 +438,7 @@ async fn test_websocket_upgrade_error_conditions() {
             .send()
             .await?;
 
-        // The server currently accepts any key format (not ideal but that's the current behavior)
+        // Warp accepts any key format - this is a known limitation
         assert_eq!(response.status(), 101);
 
         // Test case insensitive headers (should work)
