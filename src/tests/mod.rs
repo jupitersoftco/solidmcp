@@ -56,7 +56,7 @@ mod integration_tests {
             "params": {}
         });
 
-        let response = handler.handle_message(message, None).await.unwrap();
+        let response = handler.handle_message(message).await.unwrap();
 
         assert_eq!(response["jsonrpc"], "2.0");
         assert_eq!(response["id"], 1);

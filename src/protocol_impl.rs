@@ -4,7 +4,6 @@
 
 use {
     super::protocol::McpProtocol,
-    super::tools::McpTools,
     crate::error::{McpError, McpResult},
     serde_json::{json, Value},
     std::sync::atomic::{AtomicBool, Ordering},
@@ -233,15 +232,13 @@ impl McpProtocolHandlerImpl {
         info!("✅ [INIT CHECK] Client is initialized, proceeding with tools/list");
         info!("📋 Processing MCP tools list request");
         info!("   🎯 Using protocol version: {:?}", *self.protocol_version.read().await);
-        let response = McpTools::get_tools_list_for_version(self.protocol_version.read().await.as_deref());
-        let tools_count = response["tools"]
-            .as_array()
-            .map(|arr| arr.len())
-            .unwrap_or(0);
-        info!(
-            "📋 Returning {} available tools for protocol version {:?}",
-            tools_count, *self.protocol_version.read().await
-        );
+        
+        // Return empty tools list - tools should be implemented by custom handlers
+        let response = json!({
+            "tools": []
+        });
+        
+        info!("📋 Returning empty tools list (tools should be implemented via custom handlers)");
         Ok(response)
     }
 
@@ -256,43 +253,25 @@ impl McpProtocolHandlerImpl {
         })?;
         
         // Validate arguments is present and is an object
-        let arguments = params.get("arguments").ok_or_else(|| {
+        let _arguments = params.get("arguments").ok_or_else(|| {
             McpError::InvalidParams("Missing required 'arguments' field for tool call".to_string())
         })?;
         
         // Arguments must be an object
-        if !arguments.is_object() {
+        if !_arguments.is_object() {
             return Err(McpError::InvalidParams(
                 "Arguments must be an object".to_string()
             ));
         }
-        
-        let arguments = arguments.clone();
 
         debug!(
             "🛠️  Processing tool call: {} with args: {:?}",
-            tool_name, arguments
+            tool_name, _arguments
         );
 
-        match McpTools::execute_tool(tool_name, arguments).await {
-            Ok(result) => {
-                info!("🛠️  Tool '{}' executed successfully", tool_name);
-                Ok(result)
-            }
-            Err(e) => {
-                let error_msg = e.to_string();
-                if error_msg.contains("Unknown tool") {
-                    Err(McpError::UnknownTool(tool_name.to_string()))
-                } else if error_msg.contains("Missing required parameter") 
-                    || error_msg.contains("cannot be empty") 
-                    || error_msg.contains("Wrong type for") {
-                    // Convert parameter validation errors to InvalidParams
-                    Err(McpError::InvalidParams(error_msg))
-                } else {
-                    Err(McpError::Internal(e.to_string()))
-                }
-            }
-        }
+        // No built-in tools - all tools should be implemented via custom handlers
+        error!("❌ Tool '{}' not found (no built-in tools available)", tool_name);
+        Err(McpError::UnknownTool(tool_name.to_string()))
     }
 
     /// Handle cancel notifications

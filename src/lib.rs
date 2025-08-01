@@ -87,13 +87,3 @@ pub use crate::error::{McpError, McpResult};
 pub use schemars::JsonSchema;
 pub use serde_json::{json, Value};
 
-// Legacy exports for backward compatibility
-// These will be removed in v1.0
-#[doc(hidden)]
-pub use crate::protocol::McpProtocol;
-#[doc(hidden)]
-pub use crate::websocket::handle_mcp_ws_main as handle_mcp_ws;
-
-// Framework handler is internal but needed by examples
-#[doc(hidden)]
-pub use crate::framework::FrameworkHandler;
