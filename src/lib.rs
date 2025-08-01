@@ -34,8 +34,10 @@ mod content_types;
 mod error;
 mod framework;
 mod handler;
+mod health;
 mod http;
 mod http_handler;
+mod limits;
 mod logging;
 mod protocol;
 mod protocol_impl;
@@ -61,6 +63,12 @@ pub use crate::server::McpServer;
 
 // Framework API (preferred)
 pub use crate::framework::{McpServerBuilder, PromptProvider, ResourceProvider, NotificationCtx};
+
+// Resource limits configuration
+pub use crate::limits::ResourceLimits;
+
+// Health check functionality
+pub use crate::health::{HealthChecker, HealthStatus};
 
 // Handler trait and context
 pub use crate::handler::{McpHandler, McpContext};

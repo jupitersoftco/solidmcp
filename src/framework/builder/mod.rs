@@ -117,6 +117,35 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
         }
     }
 
+    /// Configure resource limits for the server.
+    ///
+    /// This allows you to set limits on various resources to prevent DoS attacks
+    /// and resource exhaustion. By default, reasonable limits are applied.
+    ///
+    /// # Parameters
+    /// - `limits`: Resource limits configuration
+    ///
+    /// # Returns
+    /// Self for method chaining
+    ///
+    /// # Examples
+    /// ```rust
+    /// use solidmcp::{McpServerBuilder, ResourceLimits};
+    /// 
+    /// let server = McpServerBuilder::new(context, "server", "1.0.0")
+    ///     .with_limits(ResourceLimits {
+    ///         max_sessions: Some(1000),
+    ///         max_message_size: 1024 * 1024, // 1MB
+    ///         ..Default::default()
+    ///     })
+    ///     .build()
+    ///     .await?;
+    /// ```
+    pub fn with_limits(mut self, limits: crate::limits::ResourceLimits) -> Self {
+        self.handler.limits = limits;
+        self
+    }
+
     /// Build the MCP server and prepare it for startup.
     ///
     /// This method finalizes the server configuration and creates an `McpServer`
@@ -148,7 +177,18 @@ impl<C: Send + Sync + 'static> McpServerBuilder<C> {
     /// }
     /// ```
     pub async fn build(self) -> Result<McpServer> {
-        McpServer::with_handler(Arc::new(self.handler)).await
+        let server_name = self.handler.server_name.clone();
+        let server_version = self.handler.server_version.clone();
+        let limits = self.handler.limits();
+        let mut server = McpServer::with_handler(Arc::new(self.handler)).await?;
+        
+        // Set server info for health checks
+        server.set_server_info(server_name, server_version);
+        
+        // TODO: Once McpServer supports setting limits, apply them here
+        // server.set_limits(limits);
+        
+        Ok(server)
     }
 }
 

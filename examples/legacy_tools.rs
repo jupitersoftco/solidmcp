@@ -5,9 +5,13 @@
 use {
     anyhow::Result,
     serde_json::{json, Value},
+    std::path::Path,
     tokio::fs,
     tracing::{debug, error, info},
 };
+
+mod utils;
+use utils::path_security::validate_path;
 
 pub struct McpTools;
 
@@ -191,7 +195,7 @@ impl McpTools {
         Ok(response)
     }
 
-    /// Read file handler for MCP with error logging
+    /// Read file handler for MCP with error logging and security validation
     async fn handle_read_file(params: Value) -> Result<Value> {
         let file_path = params["file_path"]
             .as_str()
@@ -201,9 +205,14 @@ impl McpTools {
             return Err(anyhow::anyhow!("Parameter 'file_path' cannot be empty"));
         }
         
-        debug!("📖 Reading file: {}", file_path);
+        // Security: Validate path to prevent directory traversal
+        let allowed_dir = Path::new("."); // Current directory as default allowed path
+        let safe_path = validate_path(file_path, allowed_dir)?;
+        let safe_path_str = safe_path.to_string_lossy();
+        
+        debug!("📖 Reading file: {} (validated path: {})", file_path, safe_path_str);
 
-        match fs::read_to_string(file_path).await {
+        match fs::read_to_string(&safe_path).await {
             Ok(content) => {
                 let content_length = content.len();
                 info!(

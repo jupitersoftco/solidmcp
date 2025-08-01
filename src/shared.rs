@@ -40,6 +40,7 @@
 use {
     super::protocol_impl::McpProtocolHandlerImpl,
     crate::error::{McpError, McpResult},
+    crate::limits::ResourceLimits,
     crate::logging::{generate_request_id, request_span},
     dashmap::DashMap,
     serde_json::{json, Value},
@@ -68,6 +69,8 @@ pub struct McpProtocolEngine {
     session_handlers: Arc<DashMap<String, Arc<McpProtocolHandlerImpl>>>,
     // Handler implementation for MCP functionality
     handler: Option<Arc<dyn super::handler::McpHandler>>,
+    // Resource limits configuration
+    limits: ResourceLimits,
 }
 
 impl Default for McpProtocolEngine {
@@ -96,6 +99,7 @@ impl McpProtocolEngine {
         Self {
             session_handlers: Arc::new(DashMap::new()),
             handler: None,
+            limits: ResourceLimits::default(),
         }
     }
 
@@ -126,7 +130,41 @@ impl McpProtocolEngine {
         Self {
             session_handlers: Arc::new(DashMap::new()),
             handler: Some(handler),
+            limits: ResourceLimits::default(),
         }
+    }
+    
+    /// Set resource limits for the protocol engine.
+    ///
+    /// This allows configuring limits on sessions, message sizes, and other resources
+    /// to prevent DoS attacks and resource exhaustion.
+    ///
+    /// # Parameters
+    ///
+    /// - `limits`: The resource limits configuration
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use solidmcp::ResourceLimits;
+    /// 
+    /// let mut engine = McpProtocolEngine::new();
+    /// engine.set_limits(ResourceLimits {
+    ///     max_sessions: Some(100),
+    ///     max_message_size: 512 * 1024, // 512KB
+    ///     ..Default::default()
+    /// });
+    /// ```
+    pub fn set_limits(&mut self, limits: ResourceLimits) {
+        self.limits = limits;
+    }
+    
+    /// Get the current number of active sessions
+    ///
+    /// # Returns
+    /// The number of sessions currently stored in the engine
+    pub fn session_count(&self) -> usize {
+        self.session_handlers.len()
     }
 }
 
@@ -181,6 +219,15 @@ impl McpProtocolEngine {
         message: Value,
         session_id: Option<String>, // Session ID for client isolation
     ) -> McpResult<Value> {
+        // Validate message size
+        let message_size = serde_json::to_vec(&message)
+            .map_err(|e| McpError::Json(e))?
+            .len();
+        
+        if message_size > self.limits.max_message_size {
+            return Err(McpError::MessageTooLarge(message_size, self.limits.max_message_size));
+        }
+        
         let method = message["method"]
             .as_str()
             .ok_or_else(|| McpError::InvalidParams("Missing method field".to_string()))?;
@@ -205,13 +252,25 @@ impl McpProtocolEngine {
 
         // Get or create protocol handler for this session
         // We clone the Arc to get a reference we can use across await points
-        let handler = self.session_handlers
-            .entry(session_key.clone())
-            .or_insert_with(|| {
-                trace!("Creating new protocol handler for session: {}", session_key);
-                Arc::new(McpProtocolHandlerImpl::new())
-            })
-            .clone();
+        let handler = {
+            // Check if we're creating a new session and enforce limits
+            if !self.session_handlers.contains_key(&session_key) {
+                if let Some(max_sessions) = self.limits.max_sessions {
+                    let current_sessions = self.session_handlers.len();
+                    if current_sessions >= max_sessions {
+                        return Err(McpError::TooManySessions(max_sessions));
+                    }
+                }
+            }
+            
+            self.session_handlers
+                .entry(session_key.clone())
+                .or_insert_with(|| {
+                    trace!("Creating new protocol handler for session: {}", session_key);
+                    Arc::new(McpProtocolHandlerImpl::new())
+                })
+                .clone()
+        };
 
         // If we have a custom handler, delegate to it for supported methods
         if let Some(ref custom_handler) = self.handler {

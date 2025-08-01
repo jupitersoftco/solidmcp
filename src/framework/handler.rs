@@ -9,6 +9,7 @@ use crate::handler::{
     ToolDefinition,
 };
 use crate::error::{McpError, McpResult};
+use crate::limits::ResourceLimits;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
@@ -28,6 +29,7 @@ pub struct FrameworkHandler<C> {
     pub(super) registry: ToolRegistry<C>,
     pub(super) server_name: String,
     pub(super) server_version: String,
+    pub(super) limits: ResourceLimits,
 }
 
 impl<C: Send + Sync + 'static> FrameworkHandler<C> {
@@ -61,6 +63,7 @@ impl<C: Send + Sync + 'static> FrameworkHandler<C> {
             registry: ToolRegistry::new(),
             server_name: server_name.to_string(),
             server_version: server_version.to_string(),
+            limits: ResourceLimits::default(),
         }
     }
 
@@ -74,6 +77,14 @@ impl<C: Send + Sync + 'static> FrameworkHandler<C> {
     /// Mutable reference to the internal `ToolRegistry`
     pub fn registry_mut(&mut self) -> &mut ToolRegistry<C> {
         &mut self.registry
+    }
+    
+    /// Get the configured resource limits.
+    ///
+    /// # Returns
+    /// A clone of the configured `ResourceLimits`
+    pub fn limits(&self) -> ResourceLimits {
+        self.limits.clone()
     }
 
 }

@@ -12,6 +12,9 @@ use {
     tracing::info,
 };
 
+mod utils;
+use utils::path_security::validate_path;
+
 /// Schema for the echo tool
 #[derive(serde::Deserialize, JsonSchema)]
 struct EchoInput {
@@ -44,20 +47,14 @@ async fn echo_tool(input: EchoInput) -> Result<ToolResponse> {
 async fn read_file_tool(input: ReadFileInput) -> Result<ToolResponse> {
     info!("📖 Read file tool called for: {}", input.file_path);
     
-    // Basic path validation (in production, use more robust validation)
-    let path = Path::new(&input.file_path);
+    // Security: Validate path to prevent directory traversal
+    let allowed_dir = Path::new("."); // Current directory as default allowed path
+    let safe_path = match validate_path(&input.file_path, allowed_dir) {
+        Ok(path) => path,
+        Err(e) => return Ok(ToolResponse::error(&format!("Invalid path: {}", e))),
+    };
     
-    // Prevent path traversal attacks
-    if input.file_path.contains("..") {
-        return Ok(ToolResponse::error("Path traversal not allowed"));
-    }
-    
-    // Only allow reading from current directory and subdirectories
-    if path.is_absolute() {
-        return Ok(ToolResponse::error("Absolute paths not allowed"));
-    }
-    
-    match fs::read_to_string(&input.file_path).await {
+    match fs::read_to_string(&safe_path).await {
         Ok(content) => {
             info!("✅ Successfully read file: {}", input.file_path);
             

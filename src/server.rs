@@ -15,6 +15,7 @@ use {
 pub struct McpServer {
     protocol: McpProtocol,
     protocol_engine: Arc<McpProtocolEngine>,
+    health_checker: crate::health::HealthChecker,
 }
 
 impl McpServer {
@@ -46,7 +47,28 @@ impl McpServer {
         Ok(Self {
             protocol,
             protocol_engine,
+            health_checker: crate::health::HealthChecker::default(),
         })
+    }
+
+    /// Set the server information for health checks.
+    ///
+    /// This allows customizing the server name and version that appear in health
+    /// check responses.
+    ///
+    /// # Parameters
+    ///
+    /// - `server_name`: Name of your MCP server
+    /// - `version`: Version of your MCP server
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut server = McpServer::new().await?;
+    /// server.set_server_info("my-mcp-server", "1.0.0");
+    /// ```
+    pub fn set_server_info(&mut self, server_name: impl Into<String>, version: impl Into<String>) {
+        self.health_checker = crate::health::HealthChecker::new(server_name, version);
     }
 
     /// Create a new MCP server instance with a custom handler.
@@ -102,6 +124,7 @@ impl McpServer {
         Ok(Self {
             protocol,
             protocol_engine,
+            health_checker: crate::health::HealthChecker::default(),
         })
     }
 
@@ -157,9 +180,15 @@ impl McpServer {
         let http_route = http_handler.route();
 
         // Add health check endpoint
+        let health_checker = self.health_checker.clone();
+        let protocol_engine = self.protocol_engine.clone();
         let health_route = warp::path!("health")
             .and(warp::get())
-            .map(|| warp::reply::with_status("OK", warp::http::StatusCode::OK));
+            .map(move || {
+                let session_count = protocol_engine.session_count();
+                let health_status = health_checker.get_json_status(Some(session_count));
+                warp::reply::json(&health_status)
+            });
 
         // Combine routes - warp will handle content negotiation
         let routes = ws_route.or(http_route).or(health_route);
