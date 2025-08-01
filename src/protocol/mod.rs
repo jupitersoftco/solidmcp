@@ -7,6 +7,7 @@ pub mod message;
 pub use message::{
     RawMessage, ParsedMessage, InitializeParams, ToolCallParams, 
     ResourceReadParams, PromptGetParams, NotificationMessage,
+    get_message_schema,
 };
 
 // Re-export the main protocol struct
