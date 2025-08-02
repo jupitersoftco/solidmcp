@@ -65,8 +65,8 @@ mod tests {
         for attempt in traversal_attempts {
             let result = validate_path(attempt, allowed_dir);
             assert!(result.is_err(), "Path traversal should be blocked: {}", attempt);
-            assert!(result.unwrap_err().to_string().contains("Path traversal") 
-                || result.unwrap_err().to_string().contains("Invalid path"));
+            let error_msg = result.unwrap_err().to_string();
+            assert!(error_msg.contains("Path traversal") || error_msg.contains("Invalid path"));
         }
     }
     

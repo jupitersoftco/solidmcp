@@ -5,7 +5,7 @@
 
 use {
     anyhow::Result,
-    serde_json::{json, Value},
+    serde_json::json,
     solidmcp::{McpServerBuilder, ToolResponse, JsonSchema},
     std::{env, path::Path},
     tokio::fs,
@@ -30,13 +30,12 @@ struct ReadFileInput {
 }
 
 /// Echo tool implementation
-async fn echo_tool(input: EchoInput) -> Result<ToolResponse> {
+async fn echo_tool(input: EchoInput, _ctx: std::sync::Arc<()>, _notif: Option<solidmcp::NotificationCtx>) -> Result<ToolResponse> {
     info!("📢 Echo tool called with message: {}", input.message);
     
     // Create structured response with both human-readable content and structured data
     let response = json!({
         "echo": input.message,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
         "tool": "echo"
     });
     
@@ -44,7 +43,7 @@ async fn echo_tool(input: EchoInput) -> Result<ToolResponse> {
 }
 
 /// Read file tool implementation with basic security
-async fn read_file_tool(input: ReadFileInput) -> Result<ToolResponse> {
+async fn read_file_tool(input: ReadFileInput, _ctx: std::sync::Arc<()>, _notif: Option<solidmcp::NotificationCtx>) -> Result<ToolResponse> {
     info!("📖 Read file tool called for: {}", input.file_path);
     
     // Security: Validate path to prevent directory traversal
@@ -87,10 +86,11 @@ async fn main() -> Result<()> {
     info!("🚀 Starting MCP server with example tools");
     
     // Build server with example tools
-    let server = McpServerBuilder::new()
+    let mut server = McpServerBuilder::new((), "example-tools", "1.0.0")
         .with_tool("echo", "Echo back the input message", echo_tool)
         .with_tool("read_file", "Read contents of a file", read_file_tool)
-        .build();
+        .build()
+        .await?;
     
     // Get port from environment or use default
     let port = env::var("PORT")
@@ -101,5 +101,6 @@ async fn main() -> Result<()> {
     info!("🌐 Server starting on port {}", port);
     info!("📋 Available tools: echo, read_file");
     
-    server.start(port).await
+    server.start(port).await?;
+    Ok(())
 }

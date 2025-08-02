@@ -459,7 +459,7 @@ async fn test_unsupported_uri_scheme() -> Result<(), Box<dyn std::error::Error +
             .contains("Resource read error: Resource not found"));
 
         Ok(())
-    }).await
+    }).await.map_err(|e| e.into())
 }
 
 // Helper function to create URI test server
