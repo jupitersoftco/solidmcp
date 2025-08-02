@@ -12,7 +12,7 @@ mod mcp_test_helpers;
 use mcp_test_helpers::*;
 
 // Create a test server with error-prone prompt provider
-async fn create_error_test_server() -> McpResult<u16> {
+async fn create_error_test_server() -> McpResult<(tokio::task::JoinHandle<Result<(), anyhow::Error>>, u16)> {
     use std::sync::Arc;
     use solidmcp::{
         McpServerBuilder, PromptProvider,
@@ -112,27 +112,25 @@ async fn create_error_test_server() -> McpResult<u16> {
         }
     }
 
-    let port = find_available_port().await
-        .map_err(|e| McpError::InvalidParams(format!("Failed to find port: {}", e)))?;
     let context = TestContext;
 
-    let mut server = McpServerBuilder::new(context, "error-test-server", "1.0.0")
+    let server = McpServerBuilder::new(context, "error-test-server", "1.0.0")
         .with_prompt_provider(Box::new(ErrorPromptProvider))
         .build()
-        .await?;
+        .await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to build server: {}", e)))?;
 
-    tokio::spawn(async move {
-        server.start(port).await.unwrap();
-    });
+    let (server_handle, port) = server.start_dynamic().await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to start server: {}", e)))?;
 
     tokio::time::sleep(Duration::from_millis(300)).await;
-    Ok(port)
+    Ok((server_handle, port))
 }
 
 #[tokio::test]
 async fn test_prompt_provider_error() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
-    let port = create_error_test_server().await?;
+    let (server_handle, port) = create_error_test_server().await?;
 
     let (ws_stream, _) = tokio_tungstenite::connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
     let (mut write, mut read) = ws_stream.split();
@@ -182,7 +180,7 @@ async fn test_prompt_provider_error() -> Result<(), Box<dyn std::error::Error + 
 #[tokio::test]
 async fn test_prompt_large_content() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
-    let port = create_error_test_server().await?;
+    let (server_handle, port) = create_error_test_server().await?;
 
     let (ws_stream, _) = tokio_tungstenite::connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
     let (mut write, mut read) = ws_stream.split();
@@ -241,7 +239,7 @@ async fn test_prompt_large_content() -> Result<(), Box<dyn std::error::Error + S
 #[tokio::test]
 async fn test_prompt_special_characters() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
-    let port = create_error_test_server().await?;
+    let (server_handle, port) = create_error_test_server().await?;
 
     let (ws_stream, _) = tokio_tungstenite::connect_async(&format!("ws://127.0.0.1:{}/mcp", port)).await?;
     let (mut write, mut read) = ws_stream.split();
@@ -304,7 +302,7 @@ async fn test_prompt_special_characters() -> Result<(), Box<dyn std::error::Erro
 #[tokio::test]
 async fn test_prompt_concurrent_requests() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
-    let port = create_error_test_server().await?;
+    let (server_handle, port) = create_error_test_server().await?;
 
     // Create multiple connections
     let mut handles = Vec::new();

@@ -202,7 +202,7 @@ impl PromptProvider<ComplexTestContext> for ComplexPromptProvider {
 }
 
 /// Helper to create test server with complex prompts
-async fn create_complex_test_server() -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
+async fn create_complex_test_server() -> McpResult<solidmcp::McpServer> {
     let context = ComplexTestContext {
         server_name: "complex-prompt-server".to_string(),
     };
@@ -210,7 +210,8 @@ async fn create_complex_test_server() -> Result<solidmcp::McpServer, Box<dyn std
     let server = McpServerBuilder::new(context, "complex-prompt-server", "1.0.0")
         .with_prompt_provider(Box::new(ComplexPromptProvider))
         .build()
-        .await?;
+        .await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to build server: {}", e)))?;
 
     Ok(server)
 }
@@ -220,14 +221,8 @@ async fn create_complex_test_server() -> Result<solidmcp::McpServer, Box<dyn std
 async fn test_multi_role_prompt() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_complex_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -296,14 +291,8 @@ async fn test_multi_role_prompt() -> Result<(), Box<dyn std::error::Error + Send
 async fn test_conditional_prompt() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_complex_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 

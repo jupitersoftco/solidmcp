@@ -162,7 +162,7 @@ impl PromptProvider<CachingTestContext> for CachingPromptProvider {
 }
 
 /// Helper to create caching test server
-async fn create_caching_test_server() -> Result<(solidmcp::McpServer, Arc<CachingTestContext>), Box<dyn std::error::Error + Send + Sync>> {
+async fn create_caching_test_server() -> McpResult<(solidmcp::McpServer, Arc<CachingTestContext>)> {
     let context = CachingTestContext {
         server_name: "caching-test-server".to_string(),
         call_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -174,7 +174,8 @@ async fn create_caching_test_server() -> Result<(solidmcp::McpServer, Arc<Cachin
     let server = McpServerBuilder::new(context, "caching-test-server", "1.0.0")
         .with_prompt_provider(Box::new(CachingPromptProvider))
         .build()
-        .await?;
+        .await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to build server: {}", e)))?;
 
     Ok((server, context_arc))
 }
@@ -184,14 +185,8 @@ async fn create_caching_test_server() -> Result<(solidmcp::McpServer, Arc<Cachin
 async fn test_static_prompt_consistency() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let (server, context) = create_caching_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -256,14 +251,8 @@ async fn test_static_prompt_consistency() -> Result<(), Box<dyn std::error::Erro
 async fn test_dynamic_content_changes() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let (server, _context) = create_caching_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -354,14 +343,8 @@ async fn test_dynamic_content_changes() -> Result<(), Box<dyn std::error::Error 
 async fn test_timestamp_based_content() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let (server, _context) = create_caching_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -460,14 +443,8 @@ async fn test_timestamp_based_content() -> Result<(), Box<dyn std::error::Error 
 async fn test_prompt_list_consistency() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let (server, context) = create_caching_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 

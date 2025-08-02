@@ -48,87 +48,67 @@ pub struct TestOutput {
 /// A test server that can be started and stopped for integration tests
 pub struct TestServer {
     pub addr: SocketAddr,
-    pub handle: tokio::task::JoinHandle<()>,
+    pub handle: tokio::task::JoinHandle<anyhow::Result<()>>,
 }
 
 impl TestServer {
-    /// Start a test server with a simple test tool
+    /// Start a test server with a simple test tool on a dynamic port
     pub async fn start() -> Self {
-        // Find a free port by trying different port ranges
-        for base_port in [8080, 9000, 9500, 8000, 7000] {
-            for port_offset in 0..100 {
-                let port = base_port + port_offset;
-                let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-                
-                // Check if port is available by trying to bind
-                if let Ok(listener) = std::net::TcpListener::bind(addr) {
-                    drop(listener); // Release the port
-                    
-                    let context = TestContext::new("test-server");
-                    
-                    match McpServerBuilder::new(context, "test-server", "1.0.0")
-                        .with_tool(
-                            "test_tool",
-                            "A test tool for integration testing",
-                            |input: TestInput, ctx: Arc<TestContext>, _notify| async move {
-                                let count = ctx.increment();
-                                Ok(TestOutput {
-                                    output: format!("Processed: {}", input.input),
-                                    count,
-                                })
-                            }
-                        )
-                        .with_tool(
-                            "error_tool",
-                            "A tool that always errors for testing",
-                            |_input: TestInput, _ctx: Arc<TestContext>, _notify| async move {
-                                let result: Result<TestOutput, solidmcp::McpError> = 
-                                    Err(solidmcp::McpError::Internal("Test error".to_string()));
-                                result
-                            }
-                        )
-                        .build()
-                        .await {
-                        Ok(mut server) => {
-                            let handle = tokio::spawn(async move {
-                                if let Err(e) = server.start(port).await {
-                                    eprintln!("Server failed to start on port {}: {}", port, e);
-                                }
-                            });
-                            
-                            // Wait for server to be ready and test connectivity
-                            tokio::time::sleep(Duration::from_millis(500)).await;
-                            
-                            // Test that server is responding on /health endpoint
-                            let test_client = reqwest::Client::new();
-                            for _ in 0..10 {
-                                match test_client.get(&format!("http://127.0.0.1:{}/health", port)).send().await {
-                                    Ok(response) => {
-                                        if response.status() == reqwest::StatusCode::OK {
-                                            // Server is ready!
-                                            break;
-                                        }
-                                    },
-                                    Err(_) => {
-                                        // Server not ready yet
-                                        tokio::time::sleep(Duration::from_millis(100)).await;
-                                        continue;
-                                    }
-                                }
-                            }
-                            
-                            return TestServer { addr, handle };
-                        },
-                        Err(e) => {
-                            eprintln!("Failed to build server: {}", e);
-                            continue;
-                        }
+        let context = TestContext::new("test-server");
+        
+        let server = McpServerBuilder::new(context, "test-server", "1.0.0")
+            .with_tool(
+                "test_tool",
+                "A test tool for integration testing",
+                |input: TestInput, ctx: Arc<TestContext>, _notify| async move {
+                    let count = ctx.increment();
+                    Ok(TestOutput {
+                        output: format!("Processed: {}", input.input),
+                        count,
+                    })
+                }
+            )
+            .with_tool(
+                "error_tool",
+                "A tool that always errors for testing",
+                |_input: TestInput, _ctx: Arc<TestContext>, _notify| async move {
+                    let result: Result<TestOutput, solidmcp::McpError> = 
+                        Err(solidmcp::McpError::Internal("Test error".to_string()));
+                    result
+                }
+            )
+            .build()
+            .await
+            .expect("Failed to build test server");
+        
+        // Use the new dynamic port allocation
+        let (handle, port) = server.start_dynamic().await
+            .expect("Failed to start server on dynamic port");
+        
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+        
+        // Wait for server to be ready
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        
+        // Test that server is responding on /health endpoint
+        let test_client = reqwest::Client::new();
+        for _ in 0..10 {
+            match test_client.get(&format!("http://127.0.0.1:{}/health", port)).send().await {
+                Ok(response) => {
+                    if response.status() == reqwest::StatusCode::OK {
+                        // Server is ready!
+                        break;
                     }
+                },
+                Err(_) => {
+                    // Server not ready yet
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
                 }
             }
         }
         
-        panic!("Failed to find an available port for test server");
+        TestServer { addr, handle }
     }
     
     /// Get the HTTP URL for the server

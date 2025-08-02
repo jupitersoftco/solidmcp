@@ -320,19 +320,11 @@ async fn test_resource_not_found() -> Result<(), Box<dyn std::error::Error + Sen
 }
 
 // Override the test server creation to use our resource provider
-async fn start_test_server_with_resources() -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
-    let port = find_available_port().await
-        .map_err(|e| anyhow::anyhow!("Failed to find port: {}", e))?;
-    let mut server = create_resource_test_server(()).await?;
-    
-    tokio::spawn(async move {
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
-
+async fn start_test_server_with_resources() -> Result<(tokio::task::JoinHandle<anyhow::Result<()>>, u16), Box<dyn std::error::Error + Send + Sync>> {
+    let server = create_resource_test_server(()).await?;
+    let (handle, port) = server.start_dynamic().await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
-    Ok(port)
+    Ok((handle, port))
 }
 
 // Test helper that uses our custom server
@@ -346,10 +338,10 @@ where
 {
     tracing::info!("🚀 Starting MCP resource test server for: {}", test_name);
 
-    let port = start_test_server_with_resources().await?;
+    let (server_handle, port) = start_test_server_with_resources().await?;
     let server = McpTestServer {
         port,
-        server_handle: tokio::spawn(async {}), // Dummy handle since we spawn above
+        server_handle,
     };
 
     tracing::info!("✅ MCP resource test server started on port {}", server.port);

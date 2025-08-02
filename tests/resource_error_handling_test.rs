@@ -84,11 +84,13 @@ impl ResourceProvider<()> for ErrorTestResourceProvider {
 }
 
 /// Create test server with error provider
-async fn create_error_test_server() -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
-    McpServerBuilder::new((), "error-test-server", "1.0.0")
+async fn create_error_test_server() -> McpResult<solidmcp::McpServer> {
+    let server = McpServerBuilder::new((), "error-test-server", "1.0.0")
         .with_resource_provider(Box::new(ErrorTestResourceProvider))
         .build()
         .await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to build server: {}", e)))?;
+    Ok(server)
 }
 
 /// Test resource not found error
@@ -392,19 +394,14 @@ async fn test_error_format_compliance() -> Result<(), Box<dyn std::error::Error 
 }
 
 // Helper function to create error test server
-async fn start_error_test_server() -> McpResult<u16> {
-    let port = find_available_port().await
-        .map_err(|e| McpError::InvalidParams(format!("Failed to find port: {}", e)))?;
-    let mut server = create_error_test_server().await?;
+async fn start_error_test_server() -> McpResult<(tokio::task::JoinHandle<Result<(), anyhow::Error>>, u16)> {
+    let server = create_error_test_server().await?;
     
-    tokio::spawn(async move {
-        if let Err(e) = server.start(port).await {
-            eprintln!("Error test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to start server: {}", e)))?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
-    Ok(port)
+    Ok((server_handle, port))
 }
 
 // Custom test helper for error tests
@@ -418,11 +415,11 @@ where
 {
     tracing::info!("🚀 Starting MCP error test server for: {}", test_name);
 
-    let port = start_error_test_server().await
+    let (server_handle, port) = start_error_test_server().await
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     let server = McpTestServer {
         port,
-        server_handle: tokio::spawn(async {}),
+        server_handle,
     };
 
     tracing::info!("✅ MCP error test server started on port {}", server.port);

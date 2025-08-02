@@ -194,7 +194,7 @@ impl PromptProvider<EdgeCaseTestContext> for EdgeCasePromptProvider {
 }
 
 /// Helper to create edge case test server
-async fn create_edge_case_test_server() -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
+async fn create_edge_case_test_server() -> McpResult<solidmcp::McpServer> {
     let context = EdgeCaseTestContext {
         server_name: "edge-case-test-server".to_string(),
     };
@@ -202,7 +202,8 @@ async fn create_edge_case_test_server() -> Result<solidmcp::McpServer, Box<dyn s
     let server = McpServerBuilder::new(context, "edge-case-test-server", "1.0.0")
         .with_prompt_provider(Box::new(EdgeCasePromptProvider))
         .build()
-        .await?;
+        .await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to build server: {}", e)))?;
 
     Ok(server)
 }
@@ -212,14 +213,8 @@ async fn create_edge_case_test_server() -> Result<solidmcp::McpServer, Box<dyn s
 async fn test_large_prompt_content() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_edge_case_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -282,14 +277,8 @@ async fn test_large_prompt_content() -> Result<(), Box<dyn std::error::Error + S
 async fn test_unicode_special_characters() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_edge_case_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -355,14 +344,8 @@ async fn test_unicode_special_characters() -> Result<(), Box<dyn std::error::Err
 async fn test_json_character_escaping() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_edge_case_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -426,14 +409,8 @@ async fn test_json_character_escaping() -> Result<(), Box<dyn std::error::Error 
 async fn test_empty_content_handling() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_edge_case_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 

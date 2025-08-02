@@ -21,27 +21,19 @@ pub async fn find_available_port() -> Result<u16, Box<dyn std::error::Error + Se
 /// Test server handle that manages a dynamic port server
 pub struct McpTestServer {
     pub port: u16,
-    pub server_handle: tokio::task::JoinHandle<()>,
+    pub server_handle: tokio::task::JoinHandle<anyhow::Result<()>>,
 }
 
 impl McpTestServer {
     /// Start a new MCP test server on a dynamic port
     pub async fn start() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        // Find an available port
-        let port = find_available_port().await?;
+        // Create the MCP server
+        let server = solidmcp::McpServer::new().await?;
 
-        // Start the server on the dynamic port
-        let server_handle = tokio::spawn(async move {
-            // Create the MCP server
-            let mut server = solidmcp::McpServer::new().await.unwrap();
+        // Start the server with dynamic port allocation
+        let (server_handle, port) = server.start_dynamic().await?;
 
-            // Start the server with both HTTP and WebSocket support
-            if let Err(e) = server.start(port).await {
-                eprintln!("Test server error: {e}");
-            }
-        });
-
-        // Wait a bit for the server to start
+        // Wait a bit for the server to be ready
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         Ok(Self {

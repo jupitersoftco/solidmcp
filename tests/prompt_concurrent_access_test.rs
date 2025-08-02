@@ -113,7 +113,7 @@ impl PromptProvider<ConcurrentTestContext> for ConcurrentPromptProvider {
 }
 
 /// Helper to create concurrent test server
-async fn create_concurrent_test_server() -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
+async fn create_concurrent_test_server() -> McpResult<solidmcp::McpServer> {
     let context = ConcurrentTestContext {
         server_name: "concurrent-test-server".to_string(),
         request_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -122,7 +122,8 @@ async fn create_concurrent_test_server() -> Result<solidmcp::McpServer, Box<dyn 
     let server = McpServerBuilder::new(context, "concurrent-test-server", "1.0.0")
         .with_prompt_provider(Box::new(ConcurrentPromptProvider))
         .build()
-        .await?;
+        .await
+        .map_err(|e| McpError::InvalidParams(format!("Failed to build server: {}", e)))?;
 
     Ok(server)
 }
@@ -132,14 +133,8 @@ async fn create_concurrent_test_server() -> Result<solidmcp::McpServer, Box<dyn 
 async fn test_concurrent_prompt_list() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_concurrent_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -207,14 +202,8 @@ async fn test_concurrent_prompt_list() -> Result<(), Box<dyn std::error::Error +
 async fn test_concurrent_prompt_get() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_concurrent_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -291,14 +280,8 @@ async fn test_concurrent_prompt_get() -> Result<(), Box<dyn std::error::Error + 
 async fn test_mixed_concurrent_operations() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_test_tracing();
 
-    let port = find_available_port().await?;
     let server = create_concurrent_test_server().await?;
-    let server_handle = tokio::spawn(async move {
-        let mut server = server;
-        if let Err(e) = server.start(port).await {
-            eprintln!("Test server error: {e}");
-        }
-    });
+    let (server_handle, port) = server.start_dynamic().await?;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 

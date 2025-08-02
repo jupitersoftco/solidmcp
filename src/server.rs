@@ -216,6 +216,74 @@ impl McpServer {
         Ok(())
     }
 
+    /// Start the server on an available port assigned by the OS.
+    /// 
+    /// This method binds to port 0, which tells the OS to assign any available port.
+    /// It returns the actual port that was assigned.
+    /// 
+    /// # Returns
+    /// 
+    /// A tuple of (JoinHandle, port) where:
+    /// - JoinHandle allows you to await the server task
+    /// - port is the actual port number assigned by the OS
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// let mut server = McpServer::new().await?;
+    /// let (handle, port) = server.start_dynamic().await?;
+    /// println!("Server running on port {}", port);
+    /// ```
+    pub async fn start_dynamic(self) -> Result<(tokio::task::JoinHandle<Result<()>>, u16)> {
+        debug!("🚀 Starting MCP Server on dynamic port");
+
+        // Bind to port 0 to get a dynamic port
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .context("Failed to bind to dynamic port")?;
+        
+        let actual_port = listener.local_addr()?.port();
+        debug!("🎯 Bound to dynamic port: {}", actual_port);
+
+        // Create HTTP handler
+        let http_handler = HttpMcpHandler::new(self.protocol_engine.clone());
+
+        // Combine WebSocket and HTTP routes on the same /mcp path
+        let ws_route = super::websocket::create_ws_handler(self.protocol_engine.clone());
+        let http_route = http_handler.route();
+
+        // Add health check endpoint
+        let health_checker = self.health_checker.clone();
+        let protocol_engine = self.protocol_engine.clone();
+        let health_route = warp::path!("health")
+            .and(warp::get())
+            .map(move || {
+                let session_count = protocol_engine.session_count();
+                let health_status = health_checker.get_json_status(Some(session_count));
+                warp::reply::json(&health_status)
+            });
+
+        // Combine routes
+        let routes = ws_route.or(http_route).or(health_route);
+
+        let addr = listener.local_addr()?;
+        crate::logging::log_server_ready(&format!("ws://{addr}/mcp and http://{addr}/mcp"));
+        tracing::info!(
+            endpoints = ?vec!["WS /mcp (WebSocket upgrade)", "POST /mcp (HTTP JSON-RPC)"],
+            "Available endpoints on port {}", actual_port
+        );
+
+        // Spawn the server task
+        let handle = tokio::spawn(async move {
+            use tokio_stream::wrappers::TcpListenerStream;
+            warp::serve(routes)
+                .run_incoming(TcpListenerStream::new(listener))
+                .await;
+            Ok(())
+        });
+
+        Ok((handle, actual_port))
+    }
 
     /// Get the protocol instance.
     ///
