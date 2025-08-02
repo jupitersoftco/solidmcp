@@ -172,11 +172,12 @@ impl ResourceProvider<()> for MetadataTestResourceProvider {
 }
 
 /// Create test server with metadata provider
-async fn create_metadata_test_server() -> McpResult<solidmcp::McpServer> {
-    McpServerBuilder::new((), "metadata-test-server", "1.0.0")
+async fn create_metadata_test_server() -> Result<solidmcp::McpServer, Box<dyn std::error::Error + Send + Sync>> {
+    let server = McpServerBuilder::new((), "metadata-test-server", "1.0.0")
         .with_resource_provider(Box::new(MetadataTestResourceProvider))
         .build()
-        .await
+        .await?;
+    Ok(server)
 }
 
 /// Test various MIME types and content formats
